@@ -1,0 +1,26 @@
+﻿[package]
+name = "lanpipe"
+description = "LanPipe — 局域网零暂存文件传输"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+# 生产构建必须启用：让 Tauri 使用内嵌前端资源（tauri://localhost），而不是 devUrl。
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+lanpipe-proto = { path = "../../../crates/lanpipe-proto" }
+lanpipe-net = { path = "../../../crates/lanpipe-net" }
+tokio = { version = "1", features = ["sync", "rt-multi-thread"] }
+if-addrs = "0.13"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+walkdir = "2"
+

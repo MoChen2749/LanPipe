@@ -1,0 +1,12 @@
+[package]
+name = "lanpipe-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "lanpipe-cli"
+path = "src/main.rs"
+
+[dependencies]
+lanpipe-net = { path = "../../crates/lanpipe-net" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }

@@ -1,0 +1,26 @@
+# 构建产物
+/dist/
+/dist-bin/
+/target/
+/apps/desktop/src-tauri/target/
+/apps/desktop/src-tauri/gen/
+
+# Node
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+
+# Rust
+**/*.rs.bk
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 本地配置 / 临时数据
+*.local.json
+/target-*
+
+# ?? WebView2 ??
+/.wv2/
+*.pdb

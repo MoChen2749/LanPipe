@@ -1,0 +1,124 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LanPipe</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="titlebar">
+        <div class="brand">
+          <span class="logo">LP</span>
+          <div class="brand-text">
+            <strong>LanPipe</strong>
+            <span class="sub">局域网零暂存传输</span>
+          </div>
+        </div>
+        <div class="self">
+          <span class="chip" id="self-name" title="本机显示名">…</span>
+          <span class="chip id-chip" id="self-id" title="设备 ID（点击复制）">…</span>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel send-panel">
+          <h2>发送</h2>
+          <div class="dropzone" id="dropzone">
+            <div class="drop-icon">⇪</div>
+            <p><strong>拖入文件或文件夹</strong></p>
+            <p class="muted">拖入后自动汇总文件数与总大小</p>
+            <div class="staged" id="staged">尚未选择内容</div>
+          </div>
+
+          <div class="section-head">
+            <h3 class="section-title">局域网设备</h3>
+            <button id="refresh-peers" class="btn ghost small" title="立即刷新设备列表">刷新</button>
+          </div>
+          <ul class="device-list" id="device-list">
+            <li class="empty">正在搜索局域网设备…</li>
+          </ul>
+
+          <div class="transfer" id="transfer">
+            <div class="transfer-head">
+              <span id="transfer-title">暂无传输</span>
+              <span id="transfer-percent"></span>
+            </div>
+            <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+            <p class="hint" id="transfer-hint">拖入内容后点击设备即可发送；接收进度也会显示在这里。</p>
+          </div>
+
+          <h3 class="section-title">IP 直连</h3>
+          <div class="row">
+            <input id="direct-ip" type="text" placeholder="只输尾号如 5，或 192.168.1.5:53311" spellcheck="false" autocomplete="off" />
+            <button id="direct-connect" class="btn secondary">连接</button>
+          </div>
+          <p class="hint" id="direct-hint">只输最后一段（如 5）会扫描本机各网段 x.y.z.5；也可输入完整 IP[:端口]。</p>
+        </section>
+
+        <section class="panel settings-panel">
+          <h2>设置</h2>
+
+          <label class="field">
+            <span>设备显示名</span>
+            <input id="display-name" type="text" maxlength="32" autocomplete="off" />
+            <small class="muted">其他设备上看到的名字，修改后立即生效。</small>
+          </label>
+
+          <label class="field">
+            <span>接收保存目录</span>
+            <div class="row">
+              <input id="download-dir" type="text" spellcheck="false" />
+              <button id="pick-dir" class="btn secondary">选择…</button>
+            </div>
+            <small class="muted" id="dir-status">—</small>
+          </label>
+
+          <label class="field">
+            <span>设备 ID</span>
+            <div class="row">
+              <input id="device-id" type="text" readonly />
+              <button id="reset-id" class="btn ghost" title="重新生成 ID，旧设备缓存会失效">重置</button>
+            </div>
+            <small class="muted">用于识别本机；重置后其他设备需要重新识别。</small>
+          </label>
+
+          <div class="field">
+            <span>监听端口</span>
+            <div class="row two">
+              <input id="port-udp" type="number" min="1024" max="65535" />
+              <input id="port-tcp" type="number" min="1024" max="65535" />
+            </div>
+            <small class="muted">UDP 发现 / TCP 控制与数据（保存后立即生效）</small>
+          </div>
+
+          <div class="field">
+            <span>发送并发流数</span>
+            <input id="streams" type="range" min="1" max="8" step="1" />
+            <small class="muted">发送端设置，接收端自动适配；当前 <b id="streams-value">4</b> 条，每次发送生效</small>
+          </div>
+
+          <div class="field">
+            <span>压缩</span>
+            <select id="compress">
+              <option value="off">关闭（推荐，游戏目录）</option>
+              <option value="auto">自动（仅小文本）</option>
+            </select>
+          </div>
+
+          <div class="actions">
+            <button id="save" class="btn primary">保存设置</button>
+            <span class="status" id="status"></span>
+          </div>
+
+          <details class="advanced">
+            <summary>诊断</summary>
+            <pre id="diag">—</pre>
+          </details>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+
