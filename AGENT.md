@@ -356,3 +356,12 @@ lanpipe/
 - 深浅色切换即时生效且持久化（`config.theme`）。
 - 拖入文件夹后设备列表可点击发送；接收进度/完成在「当前传输」卡片展示；错误有可读文案。
 - 设置项保存后立即生效；重启保持。
+
+### 14.4 断点续传 L1（2026-11-20）
+
+- `crates/lanpipe-net/src/journal.rs`：`manifest_digest`（元数据稳定摘要）、journal 读写（JSONL，容忍坏行）、`JournalData{root_name, records}`。
+- 协议：`Offer.manifest_digest`、`Accept.resume = ResumeState{completed, partial}`（`partial` 预留 L2）。
+- 接收端：按摘要查 journal；只信任「目标文件存在且大小一致」的记录；复用 journal 头部记录的接收根名；未完成文件的 `.lp-part` 清理重传。
+- 发送端：跳过 completed，进度以已完成字节/文件数初始化；Verify 时对已完成文件用接收端 journal 的 xxh64 比对。
+- 测试：`journal` 单测 + `tests/resume.rs`（中途掐断接收端→重启→续传，断言单根、文件树一致、进度从已完成数起步、journal 存在）。
+- 待办（L2）：`FileOffset` 单文件偏移续传、块级 bitmap、状态目录 TTL 清理。

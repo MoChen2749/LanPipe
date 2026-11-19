@@ -73,11 +73,31 @@ pub struct Offer {
     pub root_name: String,
     pub entries: Vec<ManifestEntry>,
     pub total_bytes: u64,
+    /// 清单摘要（xxHash64 十六进制），用于接收端查找断点续传 journal。
+    #[serde(default)]
+    pub manifest_digest: String,
+}
+
+/// 接收端已完成的文件（断点续传）。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ResumeState {
+    pub completed: Vec<u32>,
+    #[serde(default)]
+    pub partial: Vec<FileOffset>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FileOffset {
+    pub id: u32,
+    pub offset: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Accept {
     pub session_id: String,
+    /// 接收端找到可复用进度时返回；为空表示全量发送。
+    #[serde(default)]
+    pub resume: Option<ResumeState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

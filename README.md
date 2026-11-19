@@ -178,3 +178,10 @@ cd /mnt/f/Projects/lanpipe && cargo build --release -p lanpipe-cli
 - 接收端不再在 `Accept` 前逐个 `create_dir_all`（几万个目录在慢盘上要几十秒，会耗尽发送端等待）；目录在 Accept 后后台补齐，文件写入时也会创建父目录。
 - 单条连接异常（半帧/对端断开）只结束该连接，不再把整个会话标记失败；缺失文件由 Done 后的 `Verify → Resync` 补齐。
 - DATA 写超时 60s → 180s。
+
+### 断点续传（L1，2026-11-20）
+
+- 接收端按「manifest 摘要」在 `<状态目录>/journals/` 维护 JSONL journal，记录已完成文件（id/size/xxh64）与首次接收根目录名。
+- 再次发送同一源目录时，接收端在 `Accept.resume` 返回已完成文件集合，发送端跳过它们；接收根目录复用上次的 `LanPipe-*`，不会重复建目录。
+- 完成文件仍参与最终 `Verify`（跳过的文件用 journal 里的 xxh64 比对）；中断留下的 `.lp-part` 首版直接清理重传，单文件内部偏移续传留给 L2。
+- 状态目录：Windows `%APPDATA%\LanPipe\state`，Linux `$XDG_STATE_HOME/lanpipe`，可用 `LANPIPE_STATE_DIR` 覆盖；设计依据见 [docs/RESUME-RESEARCH.md](docs/RESUME-RESEARCH.md)。

@@ -13,9 +13,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use crate::journal;
 use lanpipe_proto::{
     read_frame, write_frame, Accept, ErrorMsg, FileDone, FrameType, Hello, ManifestEntry, Offer,
-    Reject, ResyncIds, VerifyDigest, DATA_CHUNK, MAX_CONTROL_FRAME, MAX_DATA_FRAME, PROTOCOL_VERSION,
+    Reject, ResumeState, ResyncIds, VerifyDigest, DATA_CHUNK, MAX_CONTROL_FRAME, MAX_DATA_FRAME,
+    PROTOCOL_VERSION,
 };
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -102,6 +104,8 @@ struct Session {
     received_emitted: std::sync::atomic::AtomicBool,
     /// 已完成文件的 xxh64（流式哈希），用于 Done 后与发送端核对。
     hashes: StdMutex<HashMap<u32, u64>>,
+    /// 断点续传 journal（没有 manifest 摘要时为 None）。
+    journal: Option<Arc<journal::JournalWriter>>,
 }
 
 impl Session {
@@ -242,6 +246,9 @@ impl Session {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(id, reported);
+        if let Some(journal) = &self.journal {
+            journal.record(id, written, hash);
+        }
 
         let done = self.files_done.fetch_add(1, Ordering::Relaxed) + 1;
         if let Some(rel) = self.rel_paths.get(&id) {
@@ -276,10 +283,14 @@ impl Session {
         tokio::fs::rename(&part_path, &final_path)
             .await
             .map_err(|e| format!("rename 失败 {}: {e}", final_path.display()))?;
+        let empty_hash = Xxh64::new(0).digest();
         self.hashes
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .insert(id, Xxh64::new(0).digest());
+            .insert(id, empty_hash);
+        if let Some(journal) = &self.journal {
+            journal.record(id, 0, empty_hash);
+        }
         let done = self.files_done.fetch_add(1, Ordering::Relaxed) + 1;
         let _ = self.events.send(TransferEvent::FileReceived {
             session_id: self.id.clone(),
@@ -495,13 +506,25 @@ async fn handle_conn(
                 let _ = write_frame(&mut stream, FrameType::Reject, 0, 0, &rej).await;
                 return Ok(());
             }
-            let root = dest_root.join(&offer.root_name);
+            // 续传时复用上次的接收根目录（journal 头部记录），否则新开一个根。
+            let digest = offer.manifest_digest.clone();
+            let state_root = journal::default_state_dir();
+            let journal_data = if digest.is_empty() {
+                journal::JournalData::default()
+            } else {
+                journal::load(&state_root, &dest_root, &digest)
+            };
+            let root_name = journal_data
+                .root_name
+                .clone()
+                .unwrap_or_else(|| offer.root_name.clone());
+            let root = dest_root.join(&root_name);
             let mut rel_paths = HashMap::new();
             let mut sizes = HashMap::new();
             let mut total_bytes = 0u64;
             // 目录不在 Accept 前逐个创建：几万个目录在慢盘上要几十秒，会把发送端的 Accept 等待耗光。
             // 先只记账，Accept 之后后台补齐（文件写入时也会 create_dir_all 父目录）。
-            let mut dir_paths: Vec<PathBuf> = Vec::new();
+            let mut dir_rels: Vec<PathBuf> = Vec::new();
             for e in &offer.entries {
                 let Some(rel) = safe_rel(&e.path) else {
                     let rej = serde_json::to_vec(&Reject {
@@ -511,9 +534,8 @@ async fn handle_conn(
                     let _ = write_frame(&mut stream, FrameType::Reject, 0, 0, &rej).await;
                     return Err(format!("非法路径: {}", e.path));
                 };
-                let target = root.join(&rel);
                 if e.is_dir {
-                    dir_paths.push(target);
+                    dir_rels.push(rel);
                 } else {
                     if rel_paths.insert(e.id, e.path.clone()).is_some() {
                         return Err(format!("清单中有重复 id: {}", e.id));
@@ -524,6 +546,57 @@ async fn handle_conn(
             }
             let total_files = sizes.len() as u64;
             let session_id = offer.session_id.clone();
+
+            // 断点续传：按 manifest 摘要查 journal，只信任「目标文件存在且大小一致」的完成记录。
+            let mut completed: Vec<u32> = Vec::new();
+            let mut journal_hashes: HashMap<u32, u64> = HashMap::new();
+            let mut done_bytes = 0u64;
+            let mut journal_writer: Option<Arc<journal::JournalWriter>> = None;
+            if !digest.is_empty() {
+                let records = journal_data.records.clone();
+                if let Ok(writer) =
+                    journal::JournalWriter::open(&state_root, &dest_root, &digest, &root_name)
+                {
+                    journal_writer = Some(Arc::new(writer));
+                }
+                for (id, rec) in records {
+                    let Some(size) = sizes.get(&id).copied() else {
+                        continue;
+                    };
+                    if rec.size != size {
+                        continue;
+                    }
+                    let Some(rel) = rel_paths.get(&id) else {
+                        continue;
+                    };
+                    let target = root.join(rel);
+                    if let Ok(meta) = tokio::fs::metadata(&target).await {
+                        if meta.len() == size {
+                            completed.push(id);
+                            journal_hashes.insert(id, rec.xxh64);
+                            done_bytes += size;
+                        }
+                    }
+                }
+                completed.sort_unstable();
+                // 首版只做「已完成文件跳过」：上一轮中断留下的 .lp-part 清掉重传，
+                // 单文件内部的偏移续传留给 L2。
+                for (id, rel) in rel_paths.iter() {
+                    if completed.contains(id) {
+                        continue;
+                    }
+                    let _ = tokio::fs::remove_file(part_path_for(&root.join(rel))).await;
+                }
+            }
+            let resume_state = if completed.is_empty() {
+                None
+            } else {
+                Some(ResumeState {
+                    completed: completed.clone(),
+                    partial: Vec::new(),
+                })
+            };
+
             let sess = Arc::new(Session {
                 id: session_id.clone(),
                 root: root.clone(),
@@ -533,31 +606,35 @@ async fn handle_conn(
                 total_bytes,
                 started: Instant::now(),
                 events: events.clone(),
-                files_done: AtomicU64::new(0),
-                bytes_done: AtomicU64::new(0),
+                files_done: AtomicU64::new(completed.len() as u64),
+                bytes_done: AtomicU64::new(done_bytes),
                 open: StdMutex::new(HashMap::new()),
-                progress_state: StdMutex::new((Instant::now(), 0)),
-                hashes: StdMutex::new(HashMap::new()),
+                progress_state: StdMutex::new((Instant::now(), done_bytes)),
+                hashes: StdMutex::new(journal_hashes),
+                journal: journal_writer,
                 received_emitted: std::sync::atomic::AtomicBool::new(false),
             });
             let _ = events.send(TransferEvent::Incoming {
                 session_id: session_id.clone(),
-                root_name: offer.root_name.clone(),
+                root_name: root_name.clone(),
                 files: total_files,
                 bytes: total_bytes,
             });
             sessions.lock().await.insert(session_id.clone(), Arc::clone(&sess));
+            sess.progress(true);
             let acc = serde_json::to_vec(&Accept {
                 session_id: session_id.clone(),
+                resume: resume_state,
             })
             .unwrap_or_default();
             write_frame(&mut stream, FrameType::Accept, 0, 0, &acc)
                 .await
                 .map_err(|e| format!("发送 Accept 失败: {e}"))?;
-            if !dir_paths.is_empty() {
+            if !dir_rels.is_empty() {
+                let dir_root = root.clone();
                 tokio::spawn(async move {
-                    for dir in dir_paths {
-                        let _ = tokio::fs::create_dir_all(&dir).await;
+                    for rel in dir_rels {
+                        let _ = tokio::fs::create_dir_all(dir_root.join(rel)).await;
                     }
                 });
             }
@@ -821,12 +898,15 @@ pub async fn send_paths(
         .map_err(|e| format!("连接 {target} 失败: {e}"))?;
     tune_stream(&control);
 
+    let manifest_entries: Vec<ManifestEntry> = items.iter().map(|i| i.entry.clone()).collect();
+    let manifest_digest = journal::manifest_digest(&manifest_entries);
     let offer = Offer {
         version: PROTOCOL_VERSION,
         session_id: session_id.clone(),
         root_name,
-        entries: items.iter().map(|i| i.entry.clone()).collect(),
+        entries: manifest_entries,
         total_bytes,
+        manifest_digest,
     };
     let payload = serde_json::to_vec(&offer).map_err(|e| e.to_string())?;
     write_frame(&mut control, FrameType::Offer, 0, 0, &payload)
@@ -853,6 +933,19 @@ pub async fn send_paths(
         _ => return Err("接收端返回了非预期响应".into()),
     }
 
+    // 接收端可能返回可复用进度：跳过已完成文件，其余照常发送。
+    let accepted: Option<Accept> = serde_json::from_slice(&reply.3).ok();
+    let completed: std::collections::HashSet<u32> = accepted
+        .and_then(|a| a.resume)
+        .map(|r| r.completed.into_iter().collect())
+        .unwrap_or_default();
+    let skipped_files = completed.len() as u64;
+    let skipped_bytes: u64 = items
+        .iter()
+        .filter(|i| !i.entry.is_dir && completed.contains(&i.entry.id))
+        .map(|i| i.entry.size)
+        .sum();
+
     let mut control = Some(control);
     let hashes: Arc<StdMutex<HashMap<u32, u64>>> = Arc::new(StdMutex::new(HashMap::new()));
     let items_map: Arc<HashMap<u32, SendItem>> = Arc::new(
@@ -863,9 +956,13 @@ pub async fn send_paths(
             .map(|i| (i.entry.id, i))
             .collect(),
     );
-    let data_items: Vec<SendItem> = items.iter().filter(|i| !i.entry.is_dir).cloned().collect();
-    let bytes_done = Arc::new(AtomicU64::new(0));
-    let files_done = Arc::new(AtomicU64::new(0));
+    let data_items: Vec<SendItem> = items
+        .iter()
+        .filter(|i| !i.entry.is_dir && !completed.contains(&i.entry.id))
+        .cloned()
+        .collect();
+    let bytes_done = Arc::new(AtomicU64::new(skipped_bytes));
+    let files_done = Arc::new(AtomicU64::new(skipped_files));
     let started = Instant::now();
 
     let mon_events = events.clone();
@@ -937,6 +1034,8 @@ pub async fn send_paths(
                 for fh in &digest.hashes {
                     match local.get(&fh.id) {
                         Some(h) if *h == fh.hash => {}
+                        // 断点续传跳过的文件发送端没有重算哈希，信任接收端 journal 记录。
+                        None if completed.contains(&fh.id) => {}
                         _ => bad.push(fh.id),
                     }
                 }

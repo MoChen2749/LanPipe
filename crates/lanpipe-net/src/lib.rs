@@ -1,6 +1,7 @@
 //! LanPipe 网络层：设备发现与 LP/1 传输引擎。
 
 pub mod discovery;
+pub mod journal;
 pub mod transfer;
 
 pub use discovery::{start_discovery, DiscoveryEvent, DiscoveryHandle, PeerInfo};
