@@ -99,3 +99,13 @@
 :root:not([data-backdrop]) body {
   background: var(--bg);
 }
+
+/* 移动端：dropzone 只剩两个按钮，材质层不要给它加半透明底 */
+@media (max-width: 640px) {
+  :root[data-backdrop="mica"] .dropzone,
+  :root[data-backdrop="acrylic"] .dropzone {
+    background: transparent;
+    backdrop-filter: none;
+    border: 0;
+  }
+}

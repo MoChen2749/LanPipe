@@ -23,7 +23,7 @@
 
   <!-- 发送页 -->
   <string key="send.title">发送</string>
-  <string key="send.subtitle">拖入内容，选择设备即可发送</string>
+  <string key="send.subtitle">选择文件或文件夹，再指定设备</string>
   <string key="send.drop.title">拖入文件或文件夹</string>
   <string key="send.drop.hint">支持多选 · 目录保留原结构</string>
   <string key="send.pickFiles">选择文件</string>
