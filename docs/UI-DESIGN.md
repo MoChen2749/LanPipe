@@ -92,7 +92,7 @@ grid-template-areas: "head   head"
 | --- | --- | --- |
 | 悬停/按下/焦点 | 100ms | standard `cubic-bezier(0.8,0,0.2,1)` |
 | 下拉/气泡展开 | 200ms | decelerate `cubic-bezier(0.1,0.9,0.2,1)` |
-| 导航指示条移动 | 250ms | standard |
+| 导航指示条移动 | 300ms（延迟 200ms 后开始） | standard |
 | 页面切换（8px 上移淡入） | 250ms | decelerate |
 | Toast | 250ms | decelerate |
 
@@ -359,3 +359,10 @@ export function availableLocales(): { code: Locale; name: string }[];
 ## 14. 确认记录
 
 - 2026-11-21 用户确认：整体布局按草案执行（左导航 + 两列、设备面板右侧常驻）；留白需规整（页面 24 / 区块 16–24 / 8px 网格）；**移动端不提供拖入，仅「选择文件 / 选择文件夹」**；IP 直连改为「只输 IPv4 末段 1–3 位 = 设备短 ID，扫描本机所有子网」，完整 UUID 保留为完整 ID；语言包沿用 XML。
+
+### 4.6 长列表滚动
+
+- 待发送卡固定高度（桌面上限 336px），卡头与底部主操作固定，仅文件名列表滚动；
+- 设备列表上限 264px，内部滚动；
+- 滚动条为细条（8px，圆角滑块），`overscroll-behavior: contain` 防止带动页面；
+- 窄窗（<640）单列时待发送卡上限放宽到 60vh，仍内部滚动。

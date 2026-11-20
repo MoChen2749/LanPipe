@@ -96,6 +96,7 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
   );
 
   const nav = el("nav", { class: "nav", "aria-label": "primary" });
+  let indicatorReady = false;
   const navIndicator = el("span", { class: "nav-indicator", "aria-hidden": "true" });
   nav.append(navIndicator);
   for (const item of NAV) {
@@ -140,8 +141,18 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
       if (!active) return;
       requestAnimationFrame(() => {
         const offset = active.offsetTop + active.offsetHeight / 2 - 8;
+        if (!indicatorReady) {
+          navIndicator.classList.add("no-anim");
+          navIndicator.style.transform = `translateY(${offset}px)`;
+          navIndicator.classList.add("visible");
+          requestAnimationFrame(() => {
+            navIndicator.classList.remove("no-anim");
+            indicatorReady = true;
+          });
+          return;
+        }
         navIndicator.style.transform = `translateY(${offset}px)`;
-        navIndicator.classList.toggle("visible", true);
+        navIndicator.classList.add("visible");
       });
     },
     setIdentity(name: string, shortId: string) {

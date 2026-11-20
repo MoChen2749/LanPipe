@@ -139,6 +139,10 @@ textarea {
   border-right: 1px solid var(--border);
 }
 
+.nav-indicator.no-anim {
+  transition: none;
+}
+
 .nav-indicator {
   position: absolute;
   left: 0;
@@ -150,7 +154,7 @@ textarea {
   opacity: 0;
   transform: translateY(0);
   transition:
-    transform var(--dur-gentle) var(--ease-standard),
+    transform 300ms var(--ease-standard) 200ms,
     opacity var(--dur-fast) linear;
   pointer-events: none;
 }

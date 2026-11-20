@@ -90,7 +90,7 @@ function build(rerender: () => void): HTMLElement {
     hasStaged
       ? el(
           "div",
-          { class: "list" },
+          { class: "list staged-list" },
           ...staged.map((path) =>
             el(
               "div",
