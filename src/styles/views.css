@@ -17,15 +17,15 @@
   color: var(--text-secondary);
 }
 
-/* 页面进入动画（WinUI 3 页面切换） */
-.content > * {
-  animation: view-in var(--dur-normal) var(--ease-decelerate);
+/* 页面进入动画：只在切换路由时执行（避免每次数据刷新重播） */
+.content.view-enter {
+  animation: view-in var(--dur-gentle) var(--ease-decelerate);
 }
 
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -38,40 +38,45 @@
 .send-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  column-gap: var(--space-4);
-  row-gap: var(--space-4);
-  align-items: start;
+  grid-template-rows: auto auto auto;
+  grid-template-areas:
+    "head head"
+    "drop devices"
+    "staged direct";
+  gap: var(--space-4);
+  align-items: stretch;
   max-width: 1120px;
 }
 
 .send-grid > .page-head {
-  grid-column: 1 / -1;
-  grid-row: 1;
+  grid-area: head;
   margin-bottom: 0;
 }
 
 .send-grid > .dropzone {
-  grid-column: 1;
-  grid-row: 2;
+  grid-area: drop;
 }
 
 .send-grid > .staged-card {
-  grid-column: 1;
-  grid-row: 3;
+  grid-area: staged;
   margin-top: 0;
 }
 
-.device-panel {
-  grid-column: 2;
-  grid-row: 3;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
+.send-grid > .device-panel {
+  display: contents;
 }
 
-.device-panel .card + .card {
+/* grid 内已有统一 gap，卡片兄弟间距不再叠加 */
+.send-grid .card + .card {
   margin-top: 0;
+}
+
+.device-panel > .card-devices {
+  grid-area: devices;
+}
+
+.device-panel > .card-direct {
+  grid-area: direct;
 }
 
 .dropzone {
@@ -80,7 +85,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 220px;
+  min-height: 200px;
   padding: var(--space-5);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-card);
@@ -125,7 +130,7 @@
 }
 
 .staged-card {
-  min-height: 180px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
 }
@@ -366,14 +371,12 @@
 @media (max-width: 1024px) {
   .send-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .send-grid > .page-head,
-  .send-grid > .dropzone,
-  .send-grid > .staged-card,
-  .device-panel {
-    grid-column: 1;
-    grid-row: auto;
+    grid-template-areas:
+      "head"
+      "drop"
+      "devices"
+      "staged"
+      "direct";
   }
 }
 

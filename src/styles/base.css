@@ -128,6 +128,7 @@ textarea {
 }
 
 .nav {
+  position: relative;
   grid-area: nav;
   display: flex;
   flex-direction: column;
@@ -136,6 +137,26 @@ textarea {
   padding: var(--space-2) 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
+}
+
+.nav-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  opacity: 0;
+  transform: translateY(0);
+  transition:
+    transform var(--dur-gentle) var(--ease-standard),
+    opacity var(--dur-fast) linear;
+  pointer-events: none;
+}
+
+.nav-indicator.visible {
+  opacity: 1;
 }
 
 .nav-item {

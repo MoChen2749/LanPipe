@@ -57,11 +57,19 @@
   color: var(--danger);
 }
 
+/* WinUI 3 禁用态：中性底 + 弱化文字，不使用透明 */
 .btn:disabled {
-  opacity: 0.4;
   cursor: default;
-  pointer-events: none;
+  color: var(--disabled);
+  background: var(--surface-alt);
+  border-color: var(--border);
   box-shadow: none;
+  pointer-events: none;
+}
+
+.btn.primary:disabled {
+  color: var(--disabled);
+  background: var(--surface-alt);
 }
 
 .btn.block {
@@ -655,8 +663,10 @@
 }
 
 .device .send:disabled {
-  opacity: 0.4;
   cursor: default;
+  color: var(--disabled);
+  background: var(--surface-alt);
+  border-color: var(--border);
   pointer-events: none;
 }
 

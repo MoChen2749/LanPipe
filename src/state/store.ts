@@ -84,6 +84,13 @@ export function setLocal(local: LocalInfo): void {
 }
 
 export function setPeers(peers: PeerView[]): void {
+  const same =
+    peers.length === state.peers.length &&
+    peers.every((peer, index) => {
+      const prev = state.peers[index];
+      return prev && prev.id === peer.id && prev.addr === peer.addr && prev.name === peer.name;
+    });
+  if (same) return;
   state.peers = peers;
   notify();
 }

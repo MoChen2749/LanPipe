@@ -62,6 +62,10 @@ function navigate(route: Route): void {
   cleanup = null;
   shell.setActive(route);
   shell.content.replaceChildren();
+  shell.content.classList.remove("view-enter");
+  void shell.content.offsetWidth; // 重启动画
+  shell.content.classList.add("view-enter");
+
   if (route === "send") cleanup = mountSend(shell.content);
   else if (route === "receive") cleanup = mountReceive(shell.content, navigate);
   else if (route === "history") cleanup = mountHistory(shell.content);

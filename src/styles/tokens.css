@@ -21,13 +21,14 @@
   --control-h: 32px;
   --control-h-touch: 40px;
 
-  /* 动效（Fluent 2：fast 100 / normal 150 / slow 250，fast-out-slow-in） */
+  /* 动效（Fluent 2 motion：fast 100 / normal 200 / gentle 250 / slow 300） */
   --dur-fast: 100ms;
-  --dur-normal: 150ms;
-  --dur-slow: 250ms;
+  --dur-normal: 200ms;
+  --dur-gentle: 250ms;
+  --dur-slow: 300ms;
   --ease-standard: cubic-bezier(0.8, 0, 0.2, 1);
-  --ease-decelerate: cubic-bezier(0, 0, 0, 1);
-  --ease-accelerate: cubic-bezier(1, 0, 1, 1);
+  --ease-decelerate: cubic-bezier(0.1, 0.9, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.7, 0, 1, 0.5);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -147,7 +147,7 @@ function build(rerender: () => void): HTMLElement {
 
   const deviceCard = el(
     "section",
-    { class: "card", id: "devices-card" },
+    { class: "card card-devices", id: "devices-card" },
     el(
       "div",
       { class: "card-head" },
@@ -211,7 +211,7 @@ function build(rerender: () => void): HTMLElement {
 
   const directCard = el(
     "section",
-    { class: "card" },
+    { class: "card card-direct" },
     el("div", { class: "card-head" }, el("span", { class: "card-title", text: t("direct.title") })),
     el(
       "div",

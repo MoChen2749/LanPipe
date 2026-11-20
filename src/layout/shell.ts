@@ -96,6 +96,8 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
   );
 
   const nav = el("nav", { class: "nav", "aria-label": "primary" });
+  const navIndicator = el("span", { class: "nav-indicator", "aria-hidden": "true" });
+  nav.append(navIndicator);
   for (const item of NAV) {
     const button = el(
       "button",
@@ -133,6 +135,13 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
     setActive(route: Route) {
       navButtons.forEach((button, key) => {
         button.setAttribute("aria-current", key === route ? "page" : "false");
+      });
+      const active = navButtons.get(route);
+      if (!active) return;
+      requestAnimationFrame(() => {
+        const offset = active.offsetTop + active.offsetHeight / 2 - 8;
+        navIndicator.style.transform = `translateY(${offset}px)`;
+        navIndicator.classList.toggle("visible", true);
       });
     },
     setIdentity(name: string, shortId: string) {
