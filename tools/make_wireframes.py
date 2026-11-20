@@ -109,7 +109,7 @@ def legend(d, xy, items, width=1120, size=12, cols=2):
 
 # ---------------------------------------------------------------- A 发送页
 def screen_send():
-    W, H = 1240, 800
+    W, H = 1240, 700
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
 
@@ -156,8 +156,8 @@ def screen_send():
     t(d, ((x0 + x1) // 2 + 90, y0 + 158), "选择文件夹", 12, TEXT, False, True, "mm")
     badge(d, (x1 - 16, y0 + 10), 3)
 
-    # 待发送列表
-    rr(d, (100, 318, 840, 560), 8, SURFACE, BORDER)
+    # 待发送列表（与右列底部对齐）
+    rr(d, (100, 318, 840, 668), 8, SURFACE, BORDER)
     t(d, (116, 330), "待发送 · 3 项 · 4.2 GB", 13, TEXT, True)
     t(d, (820, 332), "清空", 11, ACCENT, False, True, "ra")
     rows = [("Minecraft1.21Fabric", "文件夹 · 2,954 项 · 3.9 GB", "folder"),
@@ -170,18 +170,19 @@ def screen_send():
         t(d, (152, y + 7), name, 12, TEXT)
         t(d, (152, y + 25), meta, 10, SUBTLE)
         t(d, (806, y + 22), "移除", 10, SUBTLE, False, True, "rm")
-    rr(d, (112, 524, 300, 556), 6, ACCENT)
-    t(d, (206, 534), "选择设备发送", 12, (255, 255, 255), True, True, "mm")
-    t(d, (312, 534), "或点击右侧设备卡片直接发送", 10, SUBTLE, False, True, "lm")
+    t(d, (116, 536), "拖入区域仍可继续追加内容", 10, SUBTLE, False, True)
+    rr(d, (112, 612, 300, 644), 6, ACCENT)
+    t(d, (206, 622), "选择设备发送", 12, (255, 255, 255), True, True, "mm")
+    t(d, (312, 622), "或点击右侧设备卡片直接发送", 10, SUBTLE, False, True, "lm")
     badge(d, (824, 322), 4)
 
     # 设备面板
     px0 = 864
-    rr(d, (px0, 318, 1224, 560), 8, SURFACE, BORDER)
+    rr(d, (px0, 318, 1216, 560), 8, SURFACE, BORDER)
     t(d, (px0 + 16, 330), "附近设备", 13, TEXT, True)
     rr(d, (px0 + 176, 328, px0 + 240, 354), 5, (246, 246, 246))
     t(d, (px0 + 208, 334), "刷新", 10, MUTED, False, True, "mm")
-    badge(d, (1224 - 24, 326), 5)
+    badge(d, (1216 - 24, 326), 5)
     devices = [("WIN-2H1782KNJDF", "192.168.100.5:53321", "在线"),
                ("WSL-Ubuntu", "172.18.249.169:53311", "在线"),
                ("DESKTOP-7F2", "192.168.100.23:53311", "空闲")]
@@ -198,14 +199,13 @@ def screen_send():
     t(d, (px0 + 16, 560 - 26), "附近没有设备时，可用下方 IP 直连", 10, SUBTLE, False, True)
 
     # IP 直连
-    rr(d, (px0, 570, 1224, 668), 8, SURFACE, BORDER)
-    t(d, (px0 + 16, 580), "IP 直连", 12, TEXT, True)
-    rr(d, (px0 + 16, 602, px0 + 250, 634), 5, (250, 250, 250), BORDER)
-    t(d, (px0 + 26, 610), "192.168.1.5:53311", 10, SUBTLE, False, False)
-    rr(d, (px0 + 258, 602, px0 + 344, 634), 5, ACCENT)
-    t(d, (px0 + 301, 610), "连接", 11, (255, 255, 255), True, True, "mm")
-    t(d, (px0 + 16, 640), "输入尾号（如 5）可扫描本网段", 9, SUBTLE, False, True)
-    badge(d, (1224 - 24, 578), 6)
+    rr(d, (px0, 584, 1216, 668), 8, SURFACE, BORDER)
+    t(d, (px0 + 16, 594), "IP 直连", 12, TEXT, True)
+    rr(d, (px0 + 16, 614, px0 + 250, 646), 5, (250, 250, 250), BORDER)
+    t(d, (px0 + 26, 622), "只输尾号，如 5 / 005", 10, SUBTLE, False, True)
+    rr(d, (px0 + 258, 614, px0 + 344, 646), 5, ACCENT)
+    t(d, (px0 + 301, 622), "连接", 11, (255, 255, 255), True, True, "mm")
+    badge(d, (1216 - 24, 592), 6)
 
     # 状态栏
     rr(d, (76, H - 28, W, H), 0, (250, 250, 250))
@@ -224,7 +224,7 @@ def screen_send():
         (3, "拖放区：唯一主视觉；支持拖入/点选两种入口，空态文案 ≤ 2 行"),
         (4, "待发送列表：名称 + 类型/数量/大小；行内移除；底部主按钮（可点设备卡直接发送）"),
         (5, "附近设备：刷新 + 设备卡（名称/IP/状态/发送）；在线状态用文字+颜色双编码"),
-        (6, "IP 直连：完整 IP 或尾号扫描；默认收起为一行，失败时就地提示"),
+        (6, "IP 直连：只输 IPv4 末段 1–3 位（即设备短 ID #NNN），扫描本机全部子网；失败时就地提示"),
         (7, "状态栏：发现状态 + 版本；不放大段说明文字"),
     ], width=1180)
     canvas.save(os.path.join(OUT, "wireframe-send.png"))
@@ -257,7 +257,7 @@ def screen_receive():
     t(d, (100, 94), "本机设备名 WIN-2H1782KNJDF · 端口 53311", 11, MUTED)
 
     # 未完成传输横幅
-    rr(d, (100, 118, 1224, 196), 8, ACCENT_SOFT, (198, 224, 245))
+    rr(d, (100, 118, 1216, 196), 8, ACCENT_SOFT, (198, 224, 245))
     icon_pc(d, 116, 136)
     t(d, (148, 128), "未完成传输", 13, ACCENT, True)
     t(d, (148, 150), "来自 WSL-Ubuntu · Minecraft1.21Fabric · 863/2,954 文件（29%）", 11, TEXT)
@@ -266,10 +266,10 @@ def screen_receive():
     t(d, (1089, 148), "清除记录", 10, MUTED, False, True, "mm")
     rr(d, (1136, 140, 1212, 170), 5, ACCENT)
     t(d, (1174, 148), "查看位置", 10, (255, 255, 255), False, True, "mm")
-    badge(d, (1224 - 22, 122), 1)
+    badge(d, (1216 - 22, 122), 1)
 
     # 当前传输
-    rr(d, (100, 212, 1224, 386), 8, SURFACE, BORDER)
+    rr(d, (100, 212, 1216, 386), 8, SURFACE, BORDER)
     t(d, (116, 224), "接收中", 13, TEXT, True)
     t(d, (172, 226), "来自 WIN-2H1782KNJDF", 10, MUTED, False, True)
     rr(d, (1000, 220, 1090, 248), 5, (246, 246, 246))
@@ -286,17 +286,17 @@ def screen_receive():
     badge(d, (1086, 216), 2)
 
     # 保存位置
-    rr(d, (100, 398, 1224, 462), 8, SURFACE, BORDER)
+    rr(d, (100, 398, 1216, 462), 8, SURFACE, BORDER)
     t(d, (116, 408), "保存到", 11, MUTED, True, True)
     t(d, (172, 408), r"C:\Users\Administrator\Downloads\LanPipe", 11, TEXT, False, False)
     rr(d, (1040, 406, 1108, 434), 5, (246, 246, 246))
     t(d, (1074, 413), "更改", 10, MUTED, False, True, "mm")
     rr(d, (1116, 406, 1208, 434), 5, (246, 246, 246))
     t(d, (1162, 413), "打开", 10, MUTED, False, True, "mm")
-    badge(d, (1224 - 22, 402), 3)
+    badge(d, (1216 - 22, 402), 3)
 
     # 最近接收
-    rr(d, (100, 474, 1224, 700), 8, SURFACE, BORDER)
+    rr(d, (100, 474, 1216, 700), 8, SURFACE, BORDER)
     t(d, (116, 486), "最近接收", 13, TEXT, True)
     t(d, (1160, 488), "全部", 10, ACCENT, False, True, "ra")
     items = [("Minecraft1.21Fabric", "完成 · 2,954 文件 · 3.9 GB", "10:42", GREEN),
@@ -310,7 +310,7 @@ def screen_receive():
         t(d, (152, y + 26), meta, 10, SUBTLE, False, True)
         d.ellipse((1050, y + 20, 1058, y + 28), fill=col)
         t(d, (1066, y + 18), tm, 9, SUBTLE, False, True)
-    badge(d, (1224 - 22, 470), 4)
+    badge(d, (1216 - 22, 470), 4)
 
     rr(d, (76, H - 28, W, H), 0, (250, 250, 250))
     t(d, (90, H - 21), "已写入 867 个文件 · 校验通过 1,842", 10, MUTED, False, True)
@@ -353,10 +353,10 @@ def screen_settings():
     t(d, (100, 94), "设备 · 传输 · 网络 · 外观", 11, MUTED)
 
     def section(y, title, rows, tag=None):
-        rr(d, (100, y, 1224, y + 34 + len(rows) * 54 + 8), 8, SURFACE, BORDER)
+        rr(d, (100, y, 1216, y + 34 + len(rows) * 54 + 8), 8, SURFACE, BORDER)
         t(d, (116, y + 10), title, 12, ACCENT, True)
         if tag:
-            badge(d, (1224 - 22, y + 6), tag)
+            badge(d, (1216 - 22, y + 6), tag)
         for i, (label, value, kind) in enumerate(rows):
             yy = y + 40 + i * 54
             if i:
@@ -454,34 +454,38 @@ def screen_mobile():
             t(d, (cx, y + h - 28), label, 8, col, False, True, "mm")
         return w, h
 
-    # 左：发送
+    # 左：发送（移动端没有拖入，只有文件选择）
     phone(40, 40, "发送")
     x, y = 40, 40
-    rr(d, (x + 20, y + 84, x + 380, y + 250), 12, SURFACE, (190, 190, 190), 2)
-    icon_arrow_up(d, x + 190, y + 116)
-    t(d, (x + 200, y + 168), "拖入文件或文件夹", 14, TEXT, True, True, "mm")
-    t(d, (x + 200, y + 194), "或从下方选择", 10, SUBTLE, False, True, "mm")
-    rr(d, (x + 40, y + 214, x + 190, y + 246), 6, ACCENT)
-    t(d, (x + 115, y + 223), "选择文件", 11, (255, 255, 255), True, True, "mm")
-    rr(d, (x + 200, y + 214, x + 360, y + 246), 6, SURFACE, BORDER)
-    t(d, (x + 280, y + 223), "选择文件夹", 11, TEXT, False, True, "mm")
-    t(d, (x + 24, y + 268), "待发送 · 3 项 · 4.2 GB", 11, TEXT, True, True)
-    for i, n in enumerate(["Minecraft1.21Fabric", "mods", "README.txt"]):
-        yy = y + 288 + i * 52
-        rr(d, (x + 20, yy, x + 380, yy + 44), 8, SURFACE, BORDER)
-        icon_folder(d, x + 32, yy + 12)
-        t(d, (x + 58, yy + 8), n, 10, TEXT)
-        t(d, (x + 58, yy + 25), "2,954 项 · 3.9 GB", 8, SUBTLE, False, True)
-    t(d, (x + 24, y + 456), "附近设备", 11, TEXT, True, True)
+    rr(d, (x + 24, y + 92, x + 376, y + 208), 12, SURFACE, BORDER)
+    t(d, (x + 200, y + 112), "选择要发送的内容", 13, TEXT, True, True, "mm")
+    rr(d, (x + 44, y + 132, x + 188, y + 172), 6, ACCENT)
+    t(d, (x + 116, y + 143), "选择文件", 11, (255, 255, 255), True, True, "mm")
+    rr(d, (x + 212, y + 132, x + 356, y + 172), 6, SURFACE, BORDER)
+    t(d, (x + 284, y + 143), "选择文件夹", 11, TEXT, False, True, "mm")
+    t(d, (x + 200, y + 188), "支持多选 · 目录保留原结构", 9, SUBTLE, False, True, "mm")
+    t(d, (x + 24, y + 228), "待发送 · 3 项 · 4.2 GB", 11, TEXT, True, True)
+    rows = [("Minecraft1.21Fabric", "文件夹 · 2,954 项 · 3.9 GB"),
+            ("mods", "文件夹 · 128 项 · 240 MB"),
+            ("README.txt", "文本 · 2 KB")]
+    for i, (n, meta) in enumerate(rows):
+        yy = y + 248 + i * 54
+        rr(d, (x + 24, yy, x + 376, yy + 46), 8, SURFACE, BORDER)
+        icon_folder(d, x + 36, yy + 13)
+        t(d, (x + 62, yy + 9), n, 10, TEXT)
+        t(d, (x + 62, yy + 26), meta, 8, SUBTLE, False, True)
+    t(d, (x + 24, y + 430), "附近设备", 11, TEXT, True, True)
     for i, n in enumerate(["WIN-2H1782KNJDF", "WSL-Ubuntu"]):
-        yy = y + 476 + i * 56
-        rr(d, (x + 20, yy, x + 380, yy + 48), 8, SURFACE, BORDER)
-        icon_pc(d, x + 32, yy + 14)
-        t(d, (x + 60, yy + 8), n, 10, TEXT)
-        t(d, (x + 60, yy + 25), "在线", 8, GREEN, False, True)
-        rr(d, (x + 306, yy + 10, x + 372, yy + 38), 6, ACCENT)
-        t(d, (x + 339, yy + 17), "发送", 9, (255, 255, 255), False, True, "mm")
-    t(d, (x + 24, y + 652), "IP 直连", 10, ACCENT, True, True)
+        yy = y + 450 + i * 58
+        rr(d, (x + 24, yy, x + 376, yy + 50), 8, SURFACE, BORDER)
+        icon_pc(d, x + 36, yy + 15)
+        t(d, (x + 64, yy + 9), n, 10, TEXT)
+        t(d, (x + 64, yy + 26), "#005 · 在线", 8, SUBTLE, False, True)
+        rr(d, (x + 300, yy + 11, x + 368, yy + 39), 6, ACCENT)
+        t(d, (x + 334, yy + 18), "发送", 9, (255, 255, 255), False, True, "mm")
+    rr(d, (x + 24, y + 578, x + 376, y + 640), 10, SURFACE, BORDER)
+    t(d, (x + 40, y + 590), "IP 直连", 10, TEXT, True, True)
+    t(d, (x + 40, y + 610), "输入设备短 ID（如 005）", 9, SUBTLE, False, True)
 
     # 右：接收
     phone(520, 40, "接收")
@@ -509,7 +513,7 @@ def screen_mobile():
         t(d, (x + 58, yy + 25), st, 8, GREEN if st == "完成" else (196, 43, 28), False, True)
 
     dd = ImageDraw.Draw(img)
-    t(dd, (40, 846), "移动端（<640px）：底部 Tab 替代左侧导航；主操作保持单列；触控目标 ≥44px；设备卡横向信息 + 单一「发送」按钮", 12, TEXT, False, True)
+    t(dd, (40, 846), "移动端（<640px）：底部 Tab 替代左侧导航；无拖入，仅「选择文件 / 选择文件夹」；单列布局；触控目标 ≥44px；间距统一 24px", 12, TEXT, False, True)
     img.save(os.path.join(OUT, "wireframe-mobile.png"))
     return img
 

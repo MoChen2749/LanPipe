@@ -13,6 +13,8 @@ pnpm-debug.log*
 # Rust
 **/*.rs.bk
 
+__pycache__/
+
 # 系统
 .DS_Store
 Thumbs.db

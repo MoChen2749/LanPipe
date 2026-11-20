@@ -41,6 +41,7 @@ interface PeerView {
   id: string;
   name: string;
   addr: string;
+  shortId: string;
 }
 type TransferEvent =
   | { kind: "incoming"; sessionId: string; rootName: string; files: number; bytes: number }
@@ -56,6 +57,7 @@ let stagedPaths: string[] = [];
 let stagedSummary: StagedSummary | null = null;
 let peers: PeerView[] = [];
 let configPath: string | null = null;
+let localShortId = "000";
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -98,6 +100,12 @@ async function loadSettings(): Promise<void> {
     invoke<AppConfig>("get_settings"),
     invoke<string | null>("config_location").catch(() => null)
   ]);
+  try {
+    const info = await invoke<{ shortId?: string }>("local_info");
+    localShortId = info.shortId ?? "000";
+  } catch {
+    localShortId = "000";
+  }
   render();
 }
 
@@ -110,6 +118,8 @@ function render(): void {
   ($("display-name") as HTMLInputElement).value = config.displayName;
   ($("download-dir") as HTMLInputElement).value = config.downloadDir;
   ($("device-id") as HTMLInputElement).value = config.deviceId;
+  const shortEl = document.getElementById("device-short-id");
+  if (shortEl) shortEl.textContent = `#${localShortId}`;
   ($("port-udp") as HTMLInputElement).value = String(config.listen.udp);
   ($("port-tcp") as HTMLInputElement).value = String(config.listen.tcp);
   ($("streams") as HTMLInputElement).value = String(config.transfer.streams);
@@ -220,7 +230,7 @@ function renderPeers(): void {
     const btn = document.createElement("button");
     btn.className = "device";
     btn.title = stagedPaths.length
-      ? `发送到 ${peer.name}（${peer.addr}）`
+      ? `发送到 ${peer.name}（#${peer.shortId} · ${peer.addr}）`
       : "先拖入文件或文件夹";
     btn.disabled = stagedPaths.length === 0;
 
@@ -229,7 +239,8 @@ function renderPeers(): void {
     name.textContent = peer.name;
     const addr = document.createElement("span");
     addr.className = "device-addr";
-    addr.textContent = peer.addr;
+    addr.textContent = `#${peer.shortId} · ${peer.addr}`;
+    addr.title = `完整 ID：${peer.id}`;
     btn.append(name, addr);
     btn.addEventListener("click", () => void sendTo(peer.addr, peer.name));
     li.appendChild(btn);
@@ -317,7 +328,7 @@ async function scanOctet(octet: number): Promise<void> {
     }
     renderPeers();
     $("direct-hint").textContent = `扫描到 ${found.length} 台：${found
-      .map((p) => p.addr)
+      .map((p) => `#${p.shortId} ${p.addr}`)
       .join(", ")}${added.length ? "（已加入上方设备列表，点击即可发送）" : ""}`;
   } catch (err) {
     $("direct-hint").textContent = `扫描失败：${err}`;

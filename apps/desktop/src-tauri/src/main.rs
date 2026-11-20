@@ -56,41 +56,30 @@ fn cli_scan_args() -> Option<u16> {
 
 fn run_cli_scan(octet: u16) -> i32 {
     if octet > 255 {
-        eprintln!("尾号必须在 0-255 之间");
+        eprintln!("尾号必须在 0-255 之间（可输 5 或 005）");
         return 2;
     }
-    let port = lanpipe_proto::DEFAULT_TCP_PORT;
-    let mut targets: Vec<std::net::SocketAddrV4> = Vec::new();
-    match if_addrs::get_if_addrs() {
-        Ok(ifaces) => {
-            for iface in ifaces {
-                if iface.is_loopback() {
-                    continue;
-                }
-                if let std::net::IpAddr::V4(ip) = iface.ip() {
-                    let o = ip.octets();
-                    targets.push(std::net::SocketAddrV4::new(
-                        std::net::Ipv4Addr::new(o[0], o[1], o[2], octet as u8),
-                        port,
-                    ));
-                }
-            }
-        }
-        Err(err) => {
-            eprintln!("读取网卡失败: {err}");
-            return 3;
-        }
-    }
+    let mut targets = net::scan_candidates(octet as u8, lanpipe_proto::DEFAULT_TCP_PORT);
+    targets.extend(net::scan_candidates(
+        octet as u8,
+        lanpipe_proto::DEFAULT_TCP_PORT,
+    ));
     targets.sort();
     targets.dedup();
-    println!("扫描 *.{}:{}（{} 个候选）", octet, port, targets.len());
+    let short = format!("{octet:03}");
+    println!(
+        "扫描本机所有子网 *.{}:{}（{} 个候选，短 ID #{short}）",
+        octet,
+        lanpipe_proto::DEFAULT_TCP_PORT,
+        targets.len()
+    );
     let mut found = 0;
     for target in targets {
         let addr = std::net::SocketAddr::V4(target);
-        if std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(600))
+        if std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(700))
             .is_ok()
         {
-            println!("found {addr}");
+            println!("found {addr} shortId=#{short}");
             found += 1;
         }
     }

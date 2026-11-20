@@ -25,10 +25,84 @@ struct NetHandles {
 }
 
 #[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct PeerView {
     pub id: String,
     pub name: String,
     pub addr: String,
+    /// 设备短 ID：IPv4 最后一段三位数字（如 005），用于快速识别。
+    pub short_id: String,
+}
+
+/// 由 IP 生成三位短 ID（005、010、123…）。
+pub(crate) fn short_id_from_addr(addr: &str) -> String {
+    let host = addr.rsplit(':').nth(1).unwrap_or(addr);
+    if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
+        format!("{:03}", ip.octets()[3])
+    } else {
+        format!("{:03}", 0)
+    }
+}
+
+/// 本机短 ID：优先默认路由出口网卡的 IPv4 末段，其次任意非回环 IPv4。
+fn local_short_id() -> String {
+    if let Some(ip) = primary_local_ip() {
+        return format!("{:03}", ip.octets()[3]);
+    }
+    if let Ok(ifaces) = if_addrs::get_if_addrs() {
+        for iface in ifaces {
+            if iface.is_loopback() {
+                continue;
+            }
+            if let std::net::IpAddr::V4(ip) = iface.ip() {
+                return format!("{:03}", ip.octets()[3]);
+            }
+        }
+    }
+    "000".to_string()
+}
+
+/// 枚举本机所有子网中「最后一段等于 octet」的候选地址。
+/// 支持 /24、/22、/16 等（大于 /16 的网段跳过，避免一次探测 6 万个地址）。
+pub(crate) fn scan_candidates(octet: u8, port: u16) -> Vec<std::net::SocketAddrV4> {
+    let mut out = Vec::new();
+    let Ok(ifaces) = if_addrs::get_if_addrs() else {
+        return out;
+    };
+    for iface in ifaces {
+        if iface.is_loopback() {
+            continue;
+        }
+        let std::net::IpAddr::V4(ip) = iface.ip() else {
+            continue;
+        };
+        let mask = match iface.addr {
+            if_addrs::IfAddr::V4(v4) => u32::from(v4.netmask),
+            _ => 0xffff_ff00,
+        };
+        let network = u32::from(ip) & mask;
+        let broadcast = network | !mask;
+        if broadcast.saturating_sub(network) > 65_535 {
+            continue;
+        }
+        let mut base = network & 0xffff_ff00;
+        loop {
+            let candidate = base | octet as u32;
+            if candidate > network && candidate < broadcast {
+                out.push(std::net::SocketAddrV4::new(
+                    std::net::Ipv4Addr::from(candidate),
+                    port,
+                ));
+            }
+            if base >= broadcast {
+                break;
+            }
+            base = base.saturating_add(256);
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 fn peers_snapshot(app: &AppHandle) -> Vec<PeerView> {
@@ -36,10 +110,14 @@ fn peers_snapshot(app: &AppHandle) -> Vec<PeerView> {
     let peers = state.peers.lock().unwrap_or_else(|e| e.into_inner());
     let mut list: Vec<PeerView> = peers
         .values()
-        .map(|p| PeerView {
-            id: p.id.clone(),
-            name: p.name.clone(),
-            addr: p.addr.to_string(),
+        .map(|p| {
+            let addr = p.addr.to_string();
+            PeerView {
+                id: p.id.clone(),
+                name: p.name.clone(),
+                short_id: short_id_from_addr(&addr),
+                addr,
+            }
         })
         .collect();
     list.sort_by(|a, b| a.name.cmp(&b.name).then(a.addr.cmp(&b.addr)));
@@ -213,12 +291,13 @@ pub fn local_info(app: AppHandle) -> Result<serde_json::Value, String> {
     };
     Ok(json!({
         "id": cfg.device_id, "name": cfg.display_name,
+        "shortId": local_short_id(),
         "udpPort": udp_port, "tcpPort": tcp_port,
         "downloadDir": cfg.download_dir,
     }))
 }
 
-/// 扫描本地各网段中“最后一段等于 octet”的地址（典型用法：只输入 `5`，扫 x.y.z.5）。
+/// 扫描本机**所有子网**中「最后一段等于 octet」的设备（输入 5 / 005 / 123 均可）。
 #[tauri::command]
 pub async fn scan_last_octet(
     app: AppHandle,
@@ -229,34 +308,22 @@ pub async fn scan_last_octet(
         return Err("尾号必须在 0–255 之间".into());
     }
     let cfg = crate::settings::snapshot(&app)?;
-    let tcp_port = port.unwrap_or(cfg.listen.tcp);
-    let mut targets: Vec<std::net::SocketAddrV4> = Vec::new();
-    match if_addrs::get_if_addrs() {
-        Ok(ifaces) => {
-            for iface in ifaces {
-                if iface.is_loopback() {
-                    continue;
-                }
-                if let std::net::IpAddr::V4(ip) = iface.ip() {
-                    let o = ip.octets();
-                    targets.push(std::net::SocketAddrV4::new(
-                        std::net::Ipv4Addr::new(o[0], o[1], o[2], octet as u8),
-                        tcp_port,
-                    ));
-                }
-            }
-        }
-        Err(err) => return Err(format!("读取本机网卡失败: {err}")),
+    let mut targets = scan_candidates(octet as u8, port.unwrap_or(cfg.listen.tcp));
+    if port.is_none() && cfg.listen.tcp != lanpipe_proto::DEFAULT_TCP_PORT {
+        targets.extend(scan_candidates(
+            octet as u8,
+            lanpipe_proto::DEFAULT_TCP_PORT,
+        ));
+        targets.sort();
+        targets.dedup();
     }
-    targets.sort();
-    targets.dedup();
 
     let mut tasks = Vec::new();
     for target in targets {
         tasks.push(tokio::spawn(async move {
             let addr = std::net::SocketAddr::V4(target);
             match tokio::time::timeout(
-                std::time::Duration::from_millis(600),
+                std::time::Duration::from_millis(700),
                 tokio::net::TcpStream::connect(addr),
             )
             .await
@@ -266,12 +333,14 @@ pub async fn scan_last_octet(
             }
         }));
     }
+    let short = format!("{octet:03}");
     let mut found = Vec::new();
     for task in tasks {
         if let Ok(Some(addr)) = task.await {
             found.push(PeerView {
                 id: format!("direct:{addr}"),
-                name: "IP 直连设备".to_string(),
+                name: format!("设备 {short}"),
+                short_id: short.clone(),
                 addr: addr.to_string(),
             });
         }
@@ -335,4 +404,14 @@ pub async fn start_send(
         drop(error_tx);
     });
     Ok(addr_text)
+}
+
+/// 默认路由出口的本地 IPv4（不实际发包）。
+fn primary_local_ip() -> Option<std::net::Ipv4Addr> {
+    let sock = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    sock.connect("8.8.8.8:80").ok()?;
+    match sock.local_addr().ok()? {
+        std::net::SocketAddr::V4(v4) => Some(*v4.ip()),
+        _ => None,
+    }
 }

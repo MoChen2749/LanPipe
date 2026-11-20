@@ -191,3 +191,6 @@ cd /mnt/f/Projects/lanpipe && cargo build --release -p lanpipe-cli
 - 设计文档：[`docs/UI-DESIGN.md`](docs/UI-DESIGN.md)（WinUI 3 / Fluent 2，模块化 + i18n XML）
 - 线框草图：`docs/ui/wireframe-send.png`、`wireframe-receive.png`、`wireframe-settings.png`、`wireframe-mobile.png`
 - 断点续传为自动机制：中断后重新发送同一目录即可续传（详见 UI-DESIGN §6、`docs/RESUME-RESEARCH.md`）
+- 短 ID：设备主 IPv4 末段三位数（如 `#005`），用于同子网识别与 IP 直连；完整 UUID 保留为完整 ID（设置页可复制）
+- IP 直连：只输 1–3 位尾号 → 扫描本机所有子网的 `*.NNN:53311`；也可输入完整 `IP[:端口]`
+- 移动端（<640px）：底部 Tab，仅「选择文件 / 选择文件夹」，无拖入
