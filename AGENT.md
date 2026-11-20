@@ -154,13 +154,15 @@ LocalSend 用 53317 多播发现，已知失败原因：AP 隔离（客户端隔
 
 其他：默认绑定全部接口（UI 可指定网卡）；IPv6 link-local 作为补充；announce 带实例 ID + 启动时间，避免旧缓存；5s 无心跳判离线。
 
-## 7. UI / 交互（M0 先功能，不重设计）
+## 7. UI / 交互
+
+> M2 设计草案见 [`docs/UI-DESIGN.md`](docs/UI-DESIGN.md)（WinUI 3 / Fluent 2，模块化 + i18n XML）；线框草图见 `docs/ui/wireframe-*.png`。
 
 - 主窗 900×600，可调；深/浅色跟随系统
 - 交互流：**拖入** → 文件/目录摘要（数量/总大小）→ 设备列表（名称/平台/在线）→ 点击设备 → *接收端弹确认* → 双端进度 → 完成/失败
 - 常驻入口：**设置**（齿轮）、**IP 直连**、**接收目录**（可点击直接换）、**诊断**
 - 错误态：同名冲突、空间不足、对端拒绝、连接断开（可重试）
-- M0 用 CSS 变量占位颜色/圆角/间距，**不写死**；M1 起按 **WinUI3 视觉规范**（Mica/Acrylic、8px 圆角、Segoe UI Variable、Fluent 色板、48px 标题栏）
+- 视觉按 Fluent 2 token（accent `#005FB8`/`#4CC2FF`、8px 圆角、Segoe UI Variable、48px 标题栏）；禁用 emoji 图标，统一内联 SVG
 
 ### 7.1 设置项（M0 起必须可用）
 
@@ -221,9 +223,10 @@ lanpipe/
 | 阶段 | 内容 | 预估 |
 |---|---|---|
 | **M0（当前）** | 单机双实例 demo：拖拽 → 发现（多播/广播 + 手动 IP 兜底）→ 发送 → 进度 → 落盘校验；**设置页（接收目录 / 设备名 / 设备 ID / IP 直连 / 监听端口 / 并发流数）**；不做加密/续传/美化 | 1–2 天 |
-| M1 | 真机双端、文件级续传、1x 磁盘与 1GbE 实测、Windows 单 exe、一键防火墙放行 + 诊断页、**完整设置页（压缩/网卡/发现开关/主题）** | ~1 周 |
-| M2 | TLS/TOFU、历史记录、托盘、开机自启、语言、macOS/Linux 构建 | ~1 周 |
-| M2 | GUI 重写：WinUI3/Fluent 视觉规范、组件化、深浅色、多端适配（Win/macOS/Linux） | 进行中 |
+| M1 ✅ | 跨机双端（Windows ↔ WSL Ubuntu）、1x 磁盘、25 GB 实测、纠错重传、**断点续传 L1（journal + 跳过已完成）** | 已完成 |
+| M1（剩余） | 真实物理机 1GbE 复测、kill -9/篡改续传测试、journal TTL、小文件合批、防火墙一键放行 + 诊断页 | 进行中 |
+| M2（后续） | TLS/TOFU、历史记录持久化、托盘、开机自启、macOS/Linux 构建 | 待定 |
+| M2（进行中） | GUI 重写：WinUI 3 / Fluent 2、组件化（单文件 ≤300 行）、i18n XML、深浅色、桌面三端 + 窄屏/移动端预留 | 进行中 |
 | M3 | 打包/签名/自动更新；移动端（Android/iOS）评估 | 待定 |
 
 ## 10. 验收标准（M1 结束须全部满足）
@@ -365,3 +368,35 @@ lanpipe/
 - 发送端：跳过 completed，进度以已完成字节/文件数初始化；Verify 时对已完成文件用接收端 journal 的 xxh64 比对。
 - 测试：`journal` 单测 + `tests/resume.rs`（中途掐断接收端→重启→续传，断言单根、文件树一致、进度从已完成数起步、journal 存在）。
 - 待办（L2）：`FileOffset` 单文件偏移续传、块级 bitmap、状态目录 TTL 清理。
+
+## 16. M2 UI 设计（2026-11-20）
+
+### 16.1 设计依据
+
+- 采用 `ui-ux-pro-max` v2.0（194 条推理规则 / Fluent 2 官方风格 / WinUI 3 栈指南 / 预交付检查清单：SVG 图标、对比度 ≥4.5:1、焦点可见、尊重 reduced-motion、文本可重排、响应式 375/768/1024/1440）。
+- 技术栈不变：Tauri v2 + TypeScript + Vite，原生 DOM + CSS 变量，不引前端框架。
+- 规格文档 `docs/UI-DESIGN.md`；线框 `docs/ui/wireframe-send.png`、`wireframe-receive.png`、`wireframe-settings.png`、`wireframe-mobile.png`；生成脚本 `tools/make_wireframes.py`。
+
+### 16.2 布局
+
+- 桌面 ≥1024：标题栏 48px → 左 NavigationView 76px（发送/接收/历史/设置）→ 内容区（发送页两列：主区 + 360px 设备面板）→ 状态栏 28px。
+- 640–1024：单列，左栏收为图标；<640（移动端预留）：底部 Tab，触控目标 ≥44px。
+- 发送页：拖放区（唯一主视觉）+ 待发送列表 + 附近设备（刷新/发送）+ IP 直连（完整 IP 或尾号）。
+- 接收页：未完成传输横幅（journal 存在时）+ 当前传输卡（进度/速度/剩余）+ 保存位置 + 最近接收。
+- 设置页：设备 / 传输 / 网络 / 外观与语言 / 关于 五组。
+
+### 16.3 断点续传的界面表达
+
+续传自动触发（重发同目录 → `manifest_digest` 命中 → `Accept.resume` 跳过已完成）。UI 只提供可观测入口，不提供「继续」按钮：接收页「未完成传输」横幅（进度/来源/清除记录）、历史页「已中断」条目（`已完成/总数` + 「等待发送方继续」）、设置页「断点续传」开关 + 保留天数（默认开 / 7 天）。
+
+### 16.4 模块化与 i18n 约定
+
+- 目录：`api/`（唯一 invoke 边界）、`state/`、`layout/`、`views/`、`components/`、`i18n/`、`styles/`；**单文件 ≤300 行**。
+- 视图只做「取状态 → 组合组件 → 绑事件」，不写样式细节、不直接 invoke。
+- 语言包 `public/i18n/zh-CN.xml`（`<resources lang><string key>`），`src/i18n/loader.ts` 提供 `loadLocale/t/applyI18n`；key 命名 `area.component.role`；缺失回退中文并告警一次。
+- 文案：名词/短句、无「请/您」、无解释、无 emoji；失败信息一行 + 诊断入口。
+- Rust 侧用户可见错误统一 `{code, message}`，前端按 `error.<code>` 映射。
+
+### 16.5 待确认
+
+见 `docs/UI-DESIGN.md` §13（布局形态、设备面板位置、续传入口数量、设置分组、XML 语言包）。

@@ -185,3 +185,9 @@ cd /mnt/f/Projects/lanpipe && cargo build --release -p lanpipe-cli
 - 再次发送同一源目录时，接收端在 `Accept.resume` 返回已完成文件集合，发送端跳过它们；接收根目录复用上次的 `LanPipe-*`，不会重复建目录。
 - 完成文件仍参与最终 `Verify`（跳过的文件用 journal 里的 xxh64 比对）；中断留下的 `.lp-part` 首版直接清理重传，单文件内部偏移续传留给 L2。
 - 状态目录：Windows `%APPDATA%\LanPipe\state`，Linux `$XDG_STATE_HOME/lanpipe`，可用 `LANPIPE_STATE_DIR` 覆盖；设计依据见 [docs/RESUME-RESEARCH.md](docs/RESUME-RESEARCH.md)。
+
+## UI 设计（M2）
+
+- 设计文档：[`docs/UI-DESIGN.md`](docs/UI-DESIGN.md)（WinUI 3 / Fluent 2，模块化 + i18n XML）
+- 线框草图：`docs/ui/wireframe-send.png`、`wireframe-receive.png`、`wireframe-settings.png`、`wireframe-mobile.png`
+- 断点续传为自动机制：中断后重新发送同一目录即可续传（详见 UI-DESIGN §6、`docs/RESUME-RESEARCH.md`）
