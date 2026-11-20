@@ -74,6 +74,31 @@
 
 ---
 
+### 3.1 发送页网格（实现约束）
+
+```
+grid-template-areas: "head   head"
+                     "drop   devices"
+                     "staged direct";
+```
+
+- 右列「附近设备」顶边与拖入框对齐，「IP 直连」顶边与待发送卡对齐；
+- 行间距与列间距统一 16，左右卡片等高（stretch），不允许一侧长一侧短；
+- 发送页可用宽度上限 1120，右列固定 360。
+
+### 2.2 动效（Fluent 2 motion）
+
+| 场景 | 时长 | 缓动 |
+| --- | --- | --- |
+| 悬停/按下/焦点 | 100ms | standard `cubic-bezier(0.8,0,0.2,1)` |
+| 下拉/气泡展开 | 200ms | decelerate `cubic-bezier(0.1,0.9,0.2,1)` |
+| 导航指示条移动 | 250ms | standard |
+| 页面切换（8px 上移淡入） | 250ms | decelerate |
+| Toast | 250ms | decelerate |
+
+- 页面入场动画**只在路由切换时触发一次**，数据刷新（进度/设备列表）不得重播；
+- `prefers-reduced-motion: reduce` 时全部关闭。
+
 ## 4. 页面规格
 
 ### 4.1 发送页（`wireframe-send.png`）

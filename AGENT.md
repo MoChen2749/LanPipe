@@ -459,3 +459,4 @@ NumberBox 用 `src/ui/stepper.ts`（隐藏原生 spinner）；主题用
 node tools/ui-shot.mjs 9333 docs/shot.png [0-3] [--tall]
 node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 ```
+- 发送页布局固定为三行两列（head / drop|devices / staged|direct），右列分别与拖入框、待发送卡顶对齐；动效严格按 Fluent 2 motion：100/200/250ms，standard / decelerate 缓动；页面入场动画只在路由切换时播一次，数据刷新不重播（`.content.view-enter`），`setPeers` 无变化不通知。
