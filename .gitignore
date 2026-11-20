@@ -23,6 +23,6 @@ Thumbs.db
 *.local.json
 /target-*
 
-# ?? WebView2 ??
+# WebView2 临时数据
 /.wv2/
 *.pdb

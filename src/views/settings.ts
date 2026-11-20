@@ -1,5 +1,7 @@
 import { getState } from "../state/store";
 import { el } from "../ui/dom";
+import { dropdown } from "../ui/dropdown";
+import { stepper } from "../ui/stepper";
 import { t } from "../i18n";
 import { chooseDownloadDir, resetDeviceId, saveSettings } from "../actions";
 import { getVersion } from "@tauri-apps/api/app";
@@ -7,13 +9,12 @@ import { getVersion } from "@tauri-apps/api/app";
 let version = "";
 
 export function mountSettings(container: HTMLElement): () => void {
-  const root = build();
-  container.replaceChildren(root);
+  container.replaceChildren(build());
   void getVersion()
-    .then((v) => {
-      version = v;
+    .then((value) => {
+      version = value;
       const node = document.getElementById("about-version");
-      if (node) node.textContent = t("settings.about.version", { version: v });
+      if (node) node.textContent = t("settings.about.version", { version: value });
     })
     .catch(() => undefined);
   return () => undefined;
@@ -21,7 +22,7 @@ export function mountSettings(container: HTMLElement): () => void {
 
 function field(label: string, control: HTMLElement, hint?: string): HTMLElement {
   return el(
-    "label",
+    "div",
     { class: "field" },
     el("span", { class: "field-label", text: label }),
     control,
@@ -34,37 +35,32 @@ function build(): HTMLElement {
   const settings = state.settings;
   const shortId = state.local?.shortId ?? settings?.shortId ?? "000";
 
+  let displayName = settings?.displayName ?? "";
+  let downloadDir = settings?.downloadDir ?? "";
+  let udp = settings?.listen.udp ?? 53310;
+  let tcp = settings?.listen.tcp ?? 53311;
+  let streams = settings?.transfer.streams ?? 4;
+  let compress: "off" | "auto" = settings?.transfer.compress === "auto" ? "auto" : "off";
+  let discovery = settings?.network.discovery !== false;
+  let theme = settings?.theme ?? "system";
+  let language = settings?.language ?? "zh-CN";
+
   const nameInput = el("input", {
     class: "input",
     id: "set-name",
-    value: settings?.displayName ?? "",
+    value: displayName,
     maxlength: "64",
+    oninput: (event: Event) => {
+      displayName = (event.target as HTMLInputElement).value;
+    },
   }) as HTMLInputElement;
 
   const dirInput = el("input", {
     class: "input",
     id: "set-dir",
-    value: settings?.downloadDir ?? "",
+    value: downloadDir,
     readonly: true,
   }) as HTMLInputElement;
-
-  const dirRow = el(
-    "div",
-    { class: "row" },
-    dirInput,
-    el(
-      "button",
-      {
-        class: "btn",
-        type: "button",
-        onclick: async () => {
-          const picked = await chooseDownloadDir(dirInput.value);
-          if (picked) dirInput.value = picked;
-        },
-      },
-      t("settings.dirPick"),
-    ),
-  );
 
   const idInput = el("input", {
     class: "input",
@@ -73,45 +69,7 @@ function build(): HTMLElement {
     readonly: true,
   }) as HTMLInputElement;
 
-  const idRow = el(
-    "div",
-    { class: "row" },
-    idInput,
-    el(
-      "button",
-      {
-        class: "btn ghost",
-        type: "button",
-        onclick: async () => {
-          if (!window.confirm(t("settings.resetHint"))) return;
-          await resetDeviceId();
-          const next = getState().settings?.deviceId ?? "";
-          idInput.value = next;
-        },
-      },
-      t("settings.reset"),
-    ),
-  );
-
-  const udpInput = el("input", {
-    class: "input",
-    id: "set-udp",
-    type: "number",
-    min: "1024",
-    max: "65535",
-    value: String(settings?.listen.udp ?? 53310),
-  }) as HTMLInputElement;
-
-  const tcpInput = el("input", {
-    class: "input",
-    id: "set-tcp",
-    type: "number",
-    min: "1024",
-    max: "65535",
-    value: String(settings?.listen.tcp ?? 53311),
-  }) as HTMLInputElement;
-
-  const streamsValue = el("b", { text: String(settings?.transfer.streams ?? 4) });
+  const streamsValue = el("b", { class: "range-value", text: String(streams) });
   const streamsInput = el("input", {
     class: "range",
     id: "set-streams",
@@ -119,42 +77,55 @@ function build(): HTMLElement {
     min: "1",
     max: "8",
     step: "1",
-    value: String(settings?.transfer.streams ?? 4),
+    value: String(streams),
+    oninput: (event: Event) => {
+      streams = Number((event.target as HTMLInputElement).value);
+      streamsValue.textContent = String(streams);
+    },
   }) as HTMLInputElement;
-  streamsInput.addEventListener("input", () => {
-    streamsValue.textContent = streamsInput.value;
+
+  const compressControl = dropdown({
+    id: "set-compress",
+    value: compress,
+    options: [
+      { value: "off", label: t("settings.compressOff") },
+      { value: "auto", label: t("settings.compressAuto") },
+    ],
+    onChange: (value) => {
+      compress = value === "auto" ? "auto" : "off";
+    },
   });
 
-  const compressSelect = el(
-    "select",
-    { class: "select", id: "set-compress" },
-    el("option", { value: "off", text: t("settings.compressOff") }),
-    el("option", { value: "auto", text: t("settings.compressAuto") }),
-  ) as HTMLSelectElement;
-  compressSelect.value = settings?.transfer.compress ?? "off";
+  const themeControl = dropdown({
+    id: "set-theme",
+    value: theme,
+    options: [
+      { value: "system", label: t("settings.themeSystem") },
+      { value: "light", label: t("settings.themeLight") },
+      { value: "dark", label: t("settings.themeDark") },
+    ],
+    onChange: (value) => {
+      theme = value;
+    },
+  });
+
+  const languageControl = dropdown({
+    id: "set-language",
+    value: language,
+    options: [{ value: "zh-CN", label: "中文（简体）" }],
+    onChange: (value) => {
+      language = value;
+    },
+  });
 
   const discoveryInput = el("input", {
-    class: "checkbox",
-    id: "set-discovery",
     type: "checkbox",
-    checked: settings?.network.discovery !== false ? true : undefined,
+    id: "set-discovery",
+    checked: discovery ? true : undefined,
+    onchange: (event: Event) => {
+      discovery = (event.target as HTMLInputElement).checked;
+    },
   }) as HTMLInputElement;
-
-  const themeSelect = el(
-    "select",
-    { class: "select", id: "set-theme" },
-    el("option", { value: "system", text: t("settings.themeSystem") }),
-    el("option", { value: "light", text: t("settings.themeLight") }),
-    el("option", { value: "dark", text: t("settings.themeDark") }),
-  ) as HTMLSelectElement;
-  themeSelect.value = settings?.theme ?? "system";
-
-  const languageSelect = el(
-    "select",
-    { class: "select", id: "set-language" },
-    el("option", { value: "zh-CN", text: "中文（简体）" }),
-  ) as HTMLSelectElement;
-  languageSelect.value = settings?.language ?? "zh-CN";
 
   const saveButton = el(
     "button",
@@ -162,19 +133,18 @@ function build(): HTMLElement {
       class: "btn primary",
       type: "button",
       id: "set-save",
-      onclick: async () => {
-        await saveSettings({
+      onclick: () =>
+        void saveSettings({
           displayName: nameInput.value.trim(),
-          downloadDir: dirInput.value,
-          udp: Number(udpInput.value) || 53310,
-          tcp: Number(tcpInput.value) || 53311,
-          streams: Number(streamsInput.value) || 4,
-          compress: compressSelect.value === "auto" ? "auto" : "off",
-          discovery: discoveryInput.checked,
-          theme: themeSelect.value,
-          language: languageSelect.value,
-        });
-      },
+          downloadDir,
+          udp,
+          tcp,
+          streams,
+          compress,
+          discovery,
+          theme,
+          language,
+        }),
     },
     t("settings.save"),
   );
@@ -182,70 +152,117 @@ function build(): HTMLElement {
   const deviceCard = el(
     "section",
     { class: "card settings-card" },
-    el("div", { class: "card-title", text: t("settings.group.device") }),
+    el("div", { class: "card-head" }, el("span", { class: "card-title", text: t("settings.group.device") })),
     field(t("settings.name"), nameInput, t("settings.nameHint")),
-    field(t("settings.dir"), dirRow),
-    el(
-      "div",
-      { class: "field" },
-      el("span", { class: "field-label", text: t("settings.id") }),
-      idRow,
-      el("small", { class: "muted", id: "set-shortid", text: t("settings.shortId", { id: shortId }) }),
-      el("small", { class: "muted", text: t("settings.resetHint") }),
+    field(
+      t("settings.dir"),
+      el(
+        "div",
+        { class: "row" },
+        dirInput,
+        el(
+          "button",
+          {
+            class: "btn",
+            type: "button",
+            onclick: async () => {
+              const picked = await chooseDownloadDir(dirInput.value);
+              if (picked) {
+                downloadDir = picked;
+                dirInput.value = picked;
+              }
+            },
+          },
+          t("settings.dirPick"),
+        ),
+      ),
+    ),
+    field(
+      t("settings.id"),
+      el(
+        "div",
+        { class: "row" },
+        idInput,
+        el(
+          "button",
+          {
+            class: "btn ghost",
+            type: "button",
+            onclick: async () => {
+              if (!window.confirm(t("settings.resetHint"))) return;
+              await resetDeviceId();
+              idInput.value = getState().settings?.deviceId ?? "";
+            },
+          },
+          t("settings.reset"),
+        ),
+      ),
+      t("settings.shortId", { id: shortId }),
     ),
   );
 
   const transferCard = el(
     "section",
     { class: "card settings-card" },
-    el("div", { class: "card-title", text: t("settings.group.transfer") }),
+    el("div", { class: "card-head" }, el("span", { class: "card-title", text: t("settings.group.transfer") })),
     el(
       "div",
       { class: "field" },
       el("span", { class: "field-label", text: t("settings.streams") }),
-      el("div", { class: "row" }, streamsInput, streamsValue),
-      el("small", { class: "muted", text: t("settings.streamsHint", { n: streamsInput.value }) }),
+      el("div", { class: "range-row" }, streamsInput, streamsValue),
+      el("small", { class: "muted", text: t("settings.streamsHint", { n: String(streams) }) }),
     ),
-    field(t("settings.compress"), compressSelect),
+    field(t("settings.compress"), compressControl),
   );
 
   const networkCard = el(
     "section",
     { class: "card settings-card" },
-    el("div", { class: "card-title", text: t("settings.group.network") }),
+    el("div", { class: "card-head" }, el("span", { class: "card-title", text: t("settings.group.network") })),
     el(
       "div",
       { class: "grid-2" },
-      field(t("settings.udp"), udpInput),
-      field(t("settings.tcp"), tcpInput),
+      field(t("settings.udp"), stepper({ id: "set-udp", value: udp, min: 1024, max: 65535, onChange: (v) => (udp = v) })),
+      field(t("settings.tcp"), stepper({ id: "set-tcp", value: tcp, min: 1024, max: 65535, onChange: (v) => (tcp = v) })),
     ),
-    el("small", { class: "muted", text: t("settings.portsHint") }),
+    el("p", { class: "field-hint", text: t("settings.portsHint") }),
     el(
       "label",
       { class: "switch" },
       discoveryInput,
-      el("span", { text: t("settings.discovery") }),
-      el("small", { class: "muted", text: t("settings.discoveryHint") }),
+      el("span", { class: "track" }),
+      el(
+        "span",
+        { class: "switch-text" },
+        el("span", { text: t("settings.discovery") }),
+        el("small", { class: "muted", text: t("settings.discoveryHint") }),
+      ),
     ),
     el(
-      "button",
-      { class: "btn ghost small", type: "button", disabled: true, title: t("settings.firewallHint") },
-      t("settings.firewall"),
+      "div",
+      { class: "card-actions" },
+      el(
+        "button",
+        { class: "btn ghost small", type: "button", disabled: true, title: t("settings.firewallHint") },
+        t("settings.firewall"),
+      ),
     ),
   );
 
   const appearanceCard = el(
     "section",
     { class: "card settings-card" },
-    el("div", { class: "card-title", text: t("settings.group.appearance") }),
-    el("div", { class: "grid-2" }, field(t("settings.theme"), themeSelect), field(t("settings.language"), languageSelect)),
+    el("div", { class: "card-head" }, el("span", { class: "card-title", text: t("settings.group.appearance") })),
+    el("div", { class: "grid-2" }, field(t("settings.theme"), themeControl), field(t("settings.language"), languageControl)),
   );
 
   const aboutCard = el(
     "section",
     { class: "card settings-card" },
-    el("div", { class: "card-title", text: t("settings.group.about") }),
-    el("div", { class: "about-lines" },
+    el("div", { class: "card-head" }, el("span", { class: "card-title", text: t("settings.group.about") })),
+    el(
+      "div",
+      { class: "about-lines" },
       el("div", { id: "about-version", text: version ? t("settings.about.version", { version }) : "" }),
       el("div", { text: t("settings.about.license") }),
       el("div", { text: t("settings.about.docs") }),
@@ -256,11 +273,7 @@ function build(): HTMLElement {
     "div",
     { class: "settings-view" },
     el("div", { class: "page-head" }, el("h1", { class: "page-title", text: t("settings.title") })),
-    deviceCard,
-    transferCard,
-    networkCard,
-    appearanceCard,
-    aboutCard,
+    el("div", { class: "settings-grid" }, deviceCard, transferCard, networkCard, appearanceCard, aboutCard),
     el("div", { class: "settings-actions" }, saveButton),
   );
 }

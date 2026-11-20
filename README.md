@@ -205,3 +205,12 @@ cd /mnt/f/Projects/lanpipe && cargo build --release -p lanpipe-cli
 - `src/views/`：`send` / `receive` / `history` / `settings` 四页；`src/actions.ts` 业务动作。
 
 构建：`npm run build`（前端 → `dist/`）后再 `cargo build --release --features custom-protocol -p lanpipe`。
+
+### UI 验收截图
+
+```
+$env:LANPIPE_CDP = "9333"; Start-Process "$env:LOCALAPPDATA\Programs\LanPipe\LanPipe.exe"
+node tools/ui-shot.mjs 9333 docs/shot.png 3 --tall
+```
+
+截图由 WebView2 DevTools 协议直接取页面渲染，不依赖屏幕/前台窗口。

@@ -184,8 +184,11 @@ function idleCard(): HTMLElement {
   return el(
     "section",
     { class: "card idle-card" },
-    el("div", { class: "title", text: t("receive.idle") }),
-    el("div", { class: "hint", text: t("receive.idleHint") }),
+    svgIcon(icons.receive, 22),
+    el("div", { class: "grow" },
+      el("div", { class: "title", text: t("receive.idle") }),
+      el("div", { class: "hint", text: t("receive.idleHint") }),
+    ),
   );
 }
 

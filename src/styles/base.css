@@ -76,6 +76,7 @@ textarea {
   padding: 0 var(--space-5);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
 }
 
 .brand {
@@ -151,6 +152,9 @@ textarea {
   cursor: pointer;
   position: relative;
   font-size: 11px;
+  transition:
+    background var(--dur-normal) var(--ease-standard),
+    color var(--dur-normal) var(--ease-standard);
 }
 
 .nav-item:hover {
@@ -287,11 +291,24 @@ textarea {
   padding: var(--space-2);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
+  border-radius: var(--radius-overlay);
+  box-shadow: var(--shadow-flyout);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  transform-origin: top right;
+  animation: info-open var(--dur-normal) var(--ease-decelerate);
+}
+
+@keyframes info-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .info-title {
@@ -307,6 +324,7 @@ textarea {
   border-radius: var(--radius-control);
   cursor: pointer;
   font-variant-numeric: tabular-nums;
+  transition: background var(--dur-fast) var(--ease-standard);
 }
 
 .info-ip:hover {

@@ -11,6 +11,7 @@ import { mountSettings } from "./views/settings";
 import { applyTransferEvent, getState, setPeers, subscribe } from "./state/store";
 import { loadBootstrap, refreshPeers, setToastHandler, stagePaths } from "./actions";
 import { events } from "./api/tauri";
+import { watchTheme } from "./ui/theme";
 
 let shell: Shell;
 let cleanup: (() => void) | null = null;
@@ -28,6 +29,7 @@ async function main(): Promise<void> {
   events.transfer((event) => applyTransferEvent(event));
 
   await loadBootstrap();
+  watchTheme();
   navigate("send");
   syncChrome();
   void refreshPeers();

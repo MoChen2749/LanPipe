@@ -414,3 +414,48 @@ lanpipe/
 - 构建顺序：先 `npm run build`（产物进 `dist/`），再 `cargo build --release --features custom-protocol -p lanpipe`；顺序反了会嵌入旧前端。
 - 标题栏右上角为「信息」按钮（原设置齿轮），点击弹出本机全部 IPv4（默认路由出口地址置顶，点击复制）；设置页仍从左侧导航进入。
 - 构建与验证截图统一用 `PrintWindow`（`PW_RENDERFULLCONTENT`）截取窗口自身渲染，不依赖屏幕位置/前台窗口，避免用户操作干扰。
+
+### 16.6 M2 前端实现与视觉打磨（2026-11-21）
+
+**代码结构（单文件 ≤300 行）**
+
+```
+src/
+  api/tauri.ts        # 命令与事件类型（camelCase 对齐后端）
+  state/store.ts      # 状态容器 + 传输事件归并
+  layout/shell.ts     # 标题栏/导航/状态栏骨架
+  views/              # send / receive / history / settings 四页
+  components/         # 页面内复用块（按需新增）
+  ui/                 # dom / format / dropdown / stepper / theme
+  i18n/index.ts       # XML 语言包加载与 t()
+  styles/             # tokens / fluent-tokens / base / components / views
+```
+
+**设计 token 来源**：构建期用 `tools/gen-fluent-tokens.mjs` 从官方
+`@fluentui/tokens`（Fluent 2 `webLightTheme`/`webDarkTheme`）生成
+`src/styles/fluent-tokens.css`；品牌色保留 WinUI 3 默认 `#005FB8`/`#4CC2FF`
+（与 Fluent brand `#0F6CBD` 的差异在生成脚本中显式注释）。改主题后需重新生成：
+
+```
+npm install -D @fluentui/tokens
+node tools/gen-fluent-tokens.mjs
+```
+
+**为什么不用 OpenRapid/winui3**：10★、0 fork、最后提交 2025-06、仅一个
+10.8KB `style.css`，无暗色主题、无 token 语义（硬编码颜色），视觉为旧 Fluent；
+作为底座会限制暗色与多端适配，故只做评估不引入。
+
+**控件实现**：按钮/输入框/开关/滑杆为自有 CSS（Fluent 2 状态与阴影）；
+ComboBox 用 `src/ui/dropdown.ts`（键盘 ↑↓/Enter/Esc、点外部关闭、选中勾）；
+NumberBox 用 `src/ui/stepper.ts`（隐藏原生 spinner）；主题用
+`src/ui/theme.ts`（`data-theme` + 手动/跟随系统）。
+
+**动效**：页面进入 150ms、下拉/气泡 150ms、toast 250ms，
+统一 `cubic-bezier(0.8, 0, 0.2, 1)`；`prefers-reduced-motion` 全关。
+
+**验收截图（应用渲染，非屏幕截取）**：设置 `LANPIPE_CDP=9333` 启动后：
+
+```
+node tools/ui-shot.mjs 9333 docs/shot.png [0-3] [--tall]
+node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
+```

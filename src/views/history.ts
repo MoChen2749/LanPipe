@@ -1,5 +1,5 @@
 import { getState, subscribe } from "../state/store";
-import { clear, el } from "../ui/dom";
+import { clear, el, icons, svgIcon } from "../ui/dom";
 import { t } from "../i18n";
 import { fmtBytes } from "../ui/format";
 
@@ -53,7 +53,13 @@ function build(): HTMLElement {
           ),
         ),
       )
-    : el("div", { class: "empty", text: t("history.empty") });
+    : el(
+        "div",
+        { class: "empty empty-illustrated" },
+        svgIcon(icons.history, 28),
+        el("div", { class: "empty-title", text: t("history.empty") }),
+        el("div", { class: "empty-hint", text: t("history.emptyHint") }),
+      );
 
   return el("div", { class: "history-view" }, head, el("section", { class: "card" }, list));
 }

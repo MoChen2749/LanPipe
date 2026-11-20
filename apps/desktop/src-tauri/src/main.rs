@@ -252,7 +252,7 @@ fn main() {
                 Some(name) => format!("LanPipe ({name})"),
                 None => "LanPipe".to_string(),
             };
-            let window = tauri::WebviewWindowBuilder::new(
+            let mut builder = tauri::WebviewWindowBuilder::new(
                 app,
                 "main",
                 tauri::WebviewUrl::App("index.html".into()),
@@ -263,8 +263,17 @@ fn main() {
             .center()
             .on_page_load(|_window, payload| {
                 log(&format!("page_load {:?} {}", payload.event(), payload.url()));
-            })
-            .build();
+            });
+
+            // 仅用于自动化验收：设置 LANPIPE_CDP=<port> 时开放 DevTools 协议端口。
+            if let Ok(port) = std::env::var("LANPIPE_CDP") {
+                if !port.is_empty() {
+                    builder = builder
+                        .additional_browser_args(&format!("--remote-debugging-port={port}"));
+                }
+            }
+
+            let window = builder.build();
 
             match window {
                 Ok(window) => log(&format!(

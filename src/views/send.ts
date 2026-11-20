@@ -222,9 +222,8 @@ function build(rerender: () => void): HTMLElement {
     el("p", { class: "hint", text: ipHint || t("direct.hint") }),
   );
 
-  const mainCol = el("div", { class: "send-main" }, head, dropzone, stagedCard);
   const sideCol = el("div", { class: "device-panel" }, deviceCard, directCard);
-  return el("div", { class: "send-grid" }, mainCol, sideCol);
+  return el("div", { class: "send-grid" }, head, dropzone, stagedCard, sideCol);
 }
 
 function deviceRow(peer: { name: string; addr: string; shortId: string; id: string }): HTMLElement {

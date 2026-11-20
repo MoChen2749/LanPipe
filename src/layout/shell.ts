@@ -77,10 +77,10 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
 
   const titlebar = el(
     "header",
-    { class: "titlebar" },
+    { class: "titlebar", "data-tauri-drag-region": "" },
     el(
       "div",
-      { class: "brand" },
+      { class: "brand", "data-tauri-drag-region": "" },
       el("div", { class: "brand-logo", text: "LP" }),
       el(
         "div",
@@ -89,7 +89,7 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
         el("div", { class: "brand-sub", text: t("app.subtitle") }),
       ),
     ),
-    el("div", { class: "titlebar-spacer" }),
+    el("div", { class: "titlebar-spacer", "data-tauri-drag-region": "" }),
     identity,
     infoBtn,
     infoPop,
