@@ -1,4 +1,4 @@
-﻿# AGENT.md — LanPipe 项目方向（定稿 v0.2）
+# AGENT.md — LanPipe 项目方向（定稿 v0.2）
 
 > **本文件是本项目唯一的方向性文档（source of truth）。** 任何 agent / 协作者动工前先读它；
 > 方向、选型、协议、验收标准的变更**必须先改本文件，再改代码**。
@@ -404,3 +404,13 @@ lanpipe/
 - IP 直连：输入 1–3 位数字视为**短 ID**（IPv4 末段三位数，如 `005`），向本机所有子网 `*.NNN:53311` 并发探测；输入完整 `IP[:端口]` 直连。完整 UUID（`deviceId`）保留为完整 ID，设置页展示/复制，短 ID 变化不影响它。
 - 语言包：`public/i18n/zh-CN.xml` + `t(key)`，仅中文，预留其它语言（见 UI-DESIGN §8）。
 - 其余视觉细节以 `docs/UI-DESIGN.md` 与线框为准（用户仅作参考建议，最终以 Fluent 2 规范执行）。
+
+### 16.6 实现状态（2026-11-21）
+
+- 前端已按模块树重写（`src/`，单文件 ≤300 行）：`styles/tokens.css`（Fluent 2 token）、`styles/base.css`（48px 标题栏 / 76px 左导航 / 状态栏，<640px 底部 Tab）、`styles/components.css`、`styles/views.css`；`ui/dom.ts`（el/svgIcon/withFocusPreserved）、`ui/format.ts`；`i18n/index.ts`（XML 语言包加载 + `t()`）；`api/tauri.ts`（命令与事件类型）；`state/store.ts`（单一状态 + 事件折叠）；`layout/shell.ts`（应用骨架）；`actions.ts`（业务动作）；`views/send|receive|history|settings.ts`。
+- 多语言：`public/i18n/zh-CN.xml`（当前仅中文），key 命名 `area.component.role`，占位符 `{name}`；新增语言只需加 XML 并在 `availableLocales` 注册。
+- 交互：桌面拖放（`getCurrentWebview().onDragDropEvent` + 拖入高亮）、选择文件/文件夹、设备卡一键发送、IP 直连（短 ID 1–3 位扫全子网 / 完整 IP[:端口]）、接收页未完成横幅与保存位置、历史页、设置页（设备/传输/网络/外观/关于）。
+- 后端新增 `reveal_path` 命令（explorer/open/xdg-open，Windows 用 `CREATE_NO_WINDOW`）。
+- 构建顺序：先 `npm run build`（产物进 `dist/`），再 `cargo build --release --features custom-protocol -p lanpipe`；顺序反了会嵌入旧前端。
+- 标题栏右上角为「信息」按钮（原设置齿轮），点击弹出本机全部 IPv4（默认路由出口地址置顶，点击复制）；设置页仍从左侧导航进入。
+- 构建与验证截图统一用 `PrintWindow`（`PW_RENDERFULLCONTENT`）截取窗口自身渲染，不依赖屏幕位置/前台窗口，避免用户操作干扰。

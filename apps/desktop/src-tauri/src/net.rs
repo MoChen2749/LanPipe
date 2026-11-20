@@ -1,4 +1,4 @@
-﻿//! 把 `lanpipe-net` 的发现/接收/发送能力桥接成 Tauri 命令与事件。
+//! 把 `lanpipe-net` 的发现/接收/发送能力桥接成 Tauri 命令与事件。
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -294,6 +294,7 @@ pub fn local_info(app: AppHandle) -> Result<serde_json::Value, String> {
         "shortId": local_short_id(),
         "udpPort": udp_port, "tcpPort": tcp_port,
         "downloadDir": cfg.download_dir,
+        "ipv4": local_ipv4_addrs(),
     }))
 }
 
@@ -414,4 +415,29 @@ fn primary_local_ip() -> Option<std::net::Ipv4Addr> {
         std::net::SocketAddr::V4(v4) => Some(*v4.ip()),
         _ => None,
     }
+}
+
+/// 本机全部非回环 IPv4（默认路由出口地址排在最前），用于「信息」气泡展示。
+pub(crate) fn local_ipv4_addrs() -> Vec<String> {
+    let primary = primary_local_ip();
+    let mut addrs: Vec<std::net::Ipv4Addr> = if_addrs::get_if_addrs()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|iface| !iface.is_loopback())
+        .filter_map(|iface| match iface.addr {
+            if_addrs::IfAddr::V4(v4) => Some(v4.ip),
+            _ => None,
+        })
+        .collect();
+    addrs.sort_by_key(|ip| {
+        if Some(*ip) == primary {
+            0
+        } else if ip.is_private() {
+            1
+        } else {
+            2
+        }
+    });
+    addrs.dedup();
+    addrs.into_iter().map(|ip| ip.to_string()).collect()
 }

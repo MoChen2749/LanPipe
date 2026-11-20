@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LanPipe UI 文案（中文）。新增语言：复制本文件为 <locale>.xml，在 src/i18n/index.ts 注册。 -->
+<resources lang="zh-CN">
+  <!-- 应用 -->
+  <string key="app.name">LanPipe</string>
+  <string key="app.subtitle">局域网传输</string>
+  <string key="app.version">版本 {version}</string>
+  <string key="identity.local">本机 · {name}</string>
+
+  <!-- 导航 -->
+  <string key="nav.send">发送</string>
+  <string key="nav.receive">接收</string>
+  <string key="nav.history">历史</string>
+  <string key="nav.settings">设置</string>
+
+  <!-- 状态栏 -->
+  <string key="status.ready">就绪</string>
+  <string key="status.discovering">发现中 · {count} 台设备</string>
+  <string key="status.sending">正在发送</string>
+  <string key="status.receiving">正在接收</string>
+  <string key="status.done">已完成</string>
+  <string key="status.failed">传输失败</string>
+
+  <!-- 发送页 -->
+  <string key="send.title">发送</string>
+  <string key="send.subtitle">拖入内容，选择设备即可发送</string>
+  <string key="send.drop.title">拖入文件或文件夹</string>
+  <string key="send.drop.hint">支持多选 · 目录保留原结构</string>
+  <string key="send.pickFiles">选择文件</string>
+  <string key="send.pickFolder">选择文件夹</string>
+  <string key="send.staged.empty">尚未选择内容</string>
+  <string key="send.staged.title">待发送 · {count} 项 · {size}</string>
+  <string key="send.clear">清空</string>
+  <string key="send.remove">移除</string>
+  <string key="send.primary">选择设备发送</string>
+  <string key="send.primaryHint">也可点击右侧设备卡片直接发送</string>
+  <string key="send.empty">暂无待发送内容</string>
+
+  <!-- 设备 -->
+  <string key="devices.title">附近设备</string>
+  <string key="devices.refresh">刷新</string>
+  <string key="devices.empty">未发现设备</string>
+  <string key="devices.emptyHint">点击刷新，或使用 IP 直连</string>
+  <string key="devices.online">在线</string>
+  <string key="devices.idle">空闲</string>
+  <string key="devices.send">发送</string>
+
+  <!-- IP 直连 -->
+  <string key="direct.title">IP 直连</string>
+  <string key="direct.placeholder">只输短 ID，如 005</string>
+  <string key="direct.connect">连接</string>
+  <string key="direct.hint">只输短 ID（如 5 / 005）扫描本机所有子网；也可输入完整 IP[:端口]。</string>
+  <string key="direct.invalid">格式不正确：请输入短 ID 或 IP[:端口]</string>
+  <string key="direct.scanning">正在扫描 {target}…</string>
+  <string key="direct.found">发现 {count} 台设备</string>
+  <string key="direct.none">未发现设备</string>
+
+  <!-- 接收页 -->
+  <string key="receive.title">接收</string>
+  <string key="receive.subtitle">本机设备名 {name} · 端口 {port}</string>
+  <string key="receive.idle">等待发送端连接…</string>
+  <string key="receive.idleHint">接收端会在后台自动接收，无需操作</string>
+  <string key="receive.incomplete.title">未完成传输</string>
+  <string key="receive.incomplete.desc">来自 {name} · {done}/{total} 文件（{percent}%）</string>
+  <string key="receive.incomplete.hint">重新发送同一目录即可自动续传</string>
+  <string key="receive.current.from">来自 {name}</string>
+  <string key="receive.current.files">{done} / {total} 文件</string>
+  <string key="receive.current.bytes">{done} / {total}</string>
+  <string key="receive.current.speed">{speed} · 剩余 {eta}</string>
+  <string key="receive.current.open">打开接收文件夹</string>
+  <string key="receive.saved.title">保存到</string>
+  <string key="receive.open">打开</string>
+  <string key="receive.change">更改</string>
+  <string key="receive.recent.title">最近接收</string>
+  <string key="receive.recent.all">全部</string>
+
+  <!-- 历史页 -->
+  <string key="history.title">历史</string>
+  <string key="history.empty">暂无传输记录</string>
+  <string key="history.done">完成</string>
+  <string key="history.interrupted">已中断</string>
+  <string key="history.send">发送</string>
+  <string key="history.receive">接收</string>
+  <string key="history.meta">{files} 个文件 · {size}</string>
+
+  <!-- 设置页 -->
+  <string key="settings.title">设置</string>
+  <string key="settings.group.device">设备</string>
+  <string key="settings.group.transfer">传输</string>
+  <string key="settings.group.network">网络</string>
+  <string key="settings.group.appearance">外观与语言</string>
+  <string key="settings.group.about">关于</string>
+  <string key="settings.name">设备显示名</string>
+  <string key="settings.nameHint">其他设备上看到的名字，修改后立即生效。</string>
+  <string key="settings.dir">接收保存目录</string>
+  <string key="settings.dirPick">选择…</string>
+  <string key="settings.dirOk">目录可用，将写入此位置</string>
+  <string key="settings.dirFail">目录不可写</string>
+  <string key="settings.id">完整 ID</string>
+  <string key="settings.shortId">短 ID #{id} · 同子网可直接输入这三位数连接</string>
+  <string key="settings.reset">重置</string>
+  <string key="settings.resetHint">用于识别本机；重置完整 ID 后其他设备需重新识别。</string>
+  <string key="settings.ports">监听端口</string>
+  <string key="settings.portsHint">UDP 发现 / TCP 控制与数据（保存后立即生效）</string>
+  <string key="settings.udp">UDP</string>
+  <string key="settings.tcp">TCP</string>
+  <string key="settings.streams">发送并发流数</string>
+  <string key="settings.streamsHint">发送端设置，接收端自动适配；当前 {n} 条，每次发送生效</string>
+  <string key="settings.compress">压缩</string>
+  <string key="settings.compressOff">关闭（推荐，游戏目录）</string>
+  <string key="settings.compressAuto">自动（文本类）</string>
+  <string key="settings.discovery">局域网发现</string>
+  <string key="settings.discoveryHint">关闭后仍可用 IP 直连</string>
+  <string key="settings.firewall">防火墙放行</string>
+  <string key="settings.firewallHint">M1 提供一键放行</string>
+  <string key="settings.diagnostics">诊断</string>
+  <string key="settings.theme">主题</string>
+  <string key="settings.themeSystem">跟随系统</string>
+  <string key="settings.themeLight">浅色</string>
+  <string key="settings.themeDark">深色</string>
+  <string key="settings.language">语言</string>
+  <string key="settings.save">保存设置</string>
+  <string key="settings.about.version">版本 {version}</string>
+  <string key="settings.about.license">MIT License</string>
+  <string key="settings.about.docs">设计文档 docs/UI-DESIGN.md</string>
+
+  <!-- 提示 -->
+  <string key="toast.needContent">请先选择文件或文件夹</string>
+  <string key="info.title">本机 IPv4 地址</string>
+  <string key="info.copy">点击复制</string>
+  <string key="info.hint">点击地址即可复制</string>
+  <string key="info.empty">未找到网络地址</string>
+  <string key="toast.copied">已复制 {text}</string>
+  <string key="toast.saved">设置已保存</string>
+  <string key="toast.reset">已重置完整 ID</string>
+  <string key="toast.sendStarted">已开始发送</string>
+  <string key="toast.sendFailed">发送失败：{message}</string>
+  <string key="toast.scanNone">未发现设备</string>
+  <string key="toast.dirOk">目录可用</string>
+  <string key="toast.dirFail">目录不可写</string>
+  <string key="common.unknown">未知设备</string>
+  <string key="common.bytes">B</string>
+</resources>

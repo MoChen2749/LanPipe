@@ -1,4 +1,4 @@
-﻿#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod net;
 mod settings;
@@ -288,8 +288,43 @@ fn main() {
             net::local_info,
             net::restart_net,
             net::start_send,
+            reveal_path,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LanPipe");
 }
 
+
+/// 在系统文件管理器中显示一个路径（接收目录、已接收文件）。
+#[tauri::command]
+fn reveal_path(path: String) -> Result<(), String> {
+    let target = std::path::PathBuf::from(&path);
+    if !target.exists() {
+        return Err(format!("路径不存在: {path}"));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        // 0x08000000 = CREATE_NO_WINDOW，避免弹出命令行窗口。
+        std::process::Command::new("explorer")
+            .arg(&path)
+            .creation_flags(0x0800_0000)
+            .spawn()
+            .map_err(|err| format!("打开失败: {err}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|err| format!("打开失败: {err}"))?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|err| format!("打开失败: {err}"))?;
+    }
+    Ok(())
+}

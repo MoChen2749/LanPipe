@@ -194,3 +194,14 @@ cd /mnt/f/Projects/lanpipe && cargo build --release -p lanpipe-cli
 - 短 ID：设备主 IPv4 末段三位数（如 `#005`），用于同子网识别与 IP 直连；完整 UUID 保留为完整 ID（设置页可复制）
 - IP 直连：只输 1–3 位尾号 → 扫描本机所有子网的 `*.NNN:53311`；也可输入完整 `IP[:端口]`
 - 移动端（<640px）：底部 Tab，仅「选择文件 / 选择文件夹」，无拖入
+
+## 前端结构（M2，2026-11-21）
+
+- `src/styles/`：`tokens.css`（Fluent 2 设计变量）、`base.css`（骨架与响应式）、`components.css`、`views.css`。
+- `src/ui/`：DOM 构造与 SVG 图标、格式化函数。
+- `src/i18n/`：XML 语言包加载器（`public/i18n/zh-CN.xml`，`t(key, vars)`）。
+- `src/api/tauri.ts`：后端命令/事件封装；`src/state/store.ts`：单一状态与事件折叠。
+- `src/layout/shell.ts`：标题栏 + 左导航 + 状态栏（<640px 底部 Tab）。
+- `src/views/`：`send` / `receive` / `history` / `settings` 四页；`src/actions.ts` 业务动作。
+
+构建：`npm run build`（前端 → `dist/`）后再 `cargo build --release --features custom-protocol -p lanpipe`。
