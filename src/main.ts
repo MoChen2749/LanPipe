@@ -10,7 +10,7 @@ import { mountHistory } from "./views/history";
 import { mountSettings } from "./views/settings";
 import { applyTransferEvent, getState, setPeers, subscribe } from "./state/store";
 import { loadBootstrap, refreshPeers, setToastHandler, stagePaths } from "./actions";
-import { events } from "./api/tauri";
+import { api, events } from "./api/tauri";
 import { watchTheme } from "./ui/theme";
 
 let shell: Shell;
@@ -30,6 +30,7 @@ async function main(): Promise<void> {
 
   await loadBootstrap();
   watchTheme();
+  applyBackdrop();
   navigate("send");
   syncChrome();
   void refreshPeers();
@@ -56,20 +57,42 @@ async function main(): Promise<void> {
   }
 }
 
+const ROUTES: Route[] = ["send", "receive", "history", "settings"];
+let currentRoute: Route = "send";
+
 function navigate(route: Route): void {
   if (!shell) return;
+  const from = ROUTES.indexOf(currentRoute);
+  const to = ROUTES.indexOf(route);
+  currentRoute = route;
   cleanup?.();
   cleanup = null;
   shell.setActive(route);
   shell.content.replaceChildren();
-  shell.content.classList.remove("view-enter");
+  shell.content.classList.remove("view-enter", "view-slide-forward", "view-slide-back");
   void shell.content.offsetWidth; // 重启动画
   shell.content.classList.add("view-enter");
+  if (to > from) shell.content.classList.add("view-slide-forward");
+  else if (to < from) shell.content.classList.add("view-slide-back");
+  window.setTimeout(() => {
+    shell.content.classList.remove("view-slide-forward", "view-slide-back");
+  }, 400);
 
   if (route === "send") cleanup = mountSend(shell.content);
   else if (route === "receive") cleanup = mountReceive(shell.content, navigate);
   else if (route === "history") cleanup = mountHistory(shell.content);
   else cleanup = mountSettings(shell.content);
+}
+
+async function applyBackdrop(): Promise<void> {
+  try {
+    const info = await api.backdropInfo();
+    if (info && info !== "none") {
+      document.documentElement.dataset.backdrop = info;
+    }
+  } catch {
+    /* 浏览器预览 / 旧后端忽略 */
+  }
 }
 
 function syncChrome(): void {

@@ -17,22 +17,6 @@
   color: var(--text-secondary);
 }
 
-/* 页面进入动画：只在切换路由时执行（避免每次数据刷新重播） */
-.content.view-enter {
-  animation: view-in var(--dur-gentle) var(--ease-decelerate);
-}
-
-@keyframes view-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
 /* 发送页 --------------------------------------------------------------- */
 
 .send-grid {

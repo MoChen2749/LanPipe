@@ -366,3 +366,10 @@ export function availableLocales(): { code: Locale; name: string }[];
 - 设备列表上限 264px，内部滚动；
 - 滚动条为细条（8px，圆角滑块），`overscroll-behavior: contain` 防止带动页面；
 - 窄窗（<640）单列时待发送卡上限放宽到 60vh，仍内部滚动。
+
+### 2.3 材质（Mica / Acrylic）
+
+- 窗口底：Mica（Win11）/ Acrylic（Win10 1809+）/ 纯色；由 `backdrop_info` 决定是否启用半透明层级。
+- 卡片 84% 表面色 + blur24；标题栏 45% + blur30；导航/状态栏 30% + blur30；浮层 82% + blur40。
+- 浮层用亚克力，大背景不用；不在亚克力上放 accent 文字；避免相邻亚克力接缝。
+- 无材质环境一律不透明，保证可读性。

@@ -1,0 +1,101 @@
+/* 窗口材质（Mica / Acrylic）与半透明层 --------------------------------
+ * 参考 Windows 11 应用分层：
+ * - 窗口底层：Mica（桌面壁纸取色，静态模糊）
+ * - 标题栏/导航：透明 + 1px 分隔线，让 Mica 透出
+ * - 内容卡片：CardBackgroundFillColorDefault 语义（浅色 ~70% 白，深色 ~70% #2B2B2B）
+ * - 浮层（下拉/信息气泡/Toast）：Acrylic（更亮的模糊 + 饱和）
+ * 仅在 data-backdrop="mica|acrylic" 时启用；不支持材质的环境保持纯色，
+ * 保证 Win10 / 远程桌面 / 虚拟机下依然可读。
+ */
+
+:root[data-backdrop="mica"] body,
+:root[data-backdrop="acrylic"] body {
+  /* 内容层（WinUI LayerFillColorDefaultBrush 语义）：
+   * 半透明底色压在材质上，保证任何壁纸/系统主题下文字都有对比度，
+   * 同时材质仍然可见（约 30% 透出）。 */
+  background: color-mix(in srgb, var(--bg) 64%, transparent);
+}
+
+:root[data-backdrop="mica"] .app-root,
+:root[data-backdrop="acrylic"] .app-root {
+  background: transparent;
+}
+
+:root[data-backdrop="mica"] .titlebar,
+:root[data-backdrop="acrylic"] .titlebar {
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  backdrop-filter: saturate(1.6) blur(30px);
+  border-bottom-color: color-mix(in srgb, var(--border) 60%, transparent);
+  box-shadow: none;
+}
+
+:root[data-backdrop="mica"] .nav,
+:root[data-backdrop="acrylic"] .nav {
+  background: color-mix(in srgb, var(--surface) 30%, transparent);
+  border-right-color: color-mix(in srgb, var(--border) 55%, transparent);
+  backdrop-filter: saturate(1.4) blur(30px);
+}
+
+:root[data-backdrop="mica"] .content,
+:root[data-backdrop="acrylic"] .content {
+  background: transparent;
+}
+
+:root[data-backdrop="mica"] .statusbar,
+:root[data-backdrop="acrylic"] .statusbar {
+  background: color-mix(in srgb, var(--surface) 30%, transparent);
+  border-top-color: color-mix(in srgb, var(--border) 55%, transparent);
+  backdrop-filter: saturate(1.4) blur(30px);
+}
+
+:root[data-backdrop="mica"] .card,
+:root[data-backdrop="acrylic"] .card {
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+  backdrop-filter: saturate(1.2) blur(24px);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-backdrop="mica"] .card:hover,
+:root[data-backdrop="acrylic"] .card:hover {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+:root[data-backdrop="mica"] .dropzone,
+:root[data-backdrop="acrylic"] .dropzone {
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  backdrop-filter: saturate(1.2) blur(18px);
+}
+
+:root[data-backdrop="mica"] .list-row,
+:root[data-backdrop="acrylic"] .list-row,
+:root[data-backdrop="mica"] .device,
+:root[data-backdrop="acrylic"] .device {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+/* 浮层用更亮的 Acrylic，保持可读性 */
+:root[data-backdrop="mica"] .dd-pop,
+:root[data-backdrop="acrylic"] .dd-pop,
+:root[data-backdrop="mica"] .info-pop,
+:root[data-backdrop="acrylic"] .info-pop,
+:root[data-backdrop="mica"] .toast,
+:root[data-backdrop="acrylic"] .toast {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: saturate(1.8) blur(40px);
+}
+
+/* 窄屏：底部 Tab 栏用 Acrylic，悬浮在内容之上 */
+@media (max-width: 640px) {
+  :root[data-backdrop="mica"] .nav,
+  :root[data-backdrop="acrylic"] .nav {
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    backdrop-filter: saturate(1.8) blur(40px);
+  }
+}
+
+/* 无材质环境（Win10 / 不支持）回退：不透明背景 */
+:root:not([data-backdrop]) body {
+  background: var(--bg);
+}

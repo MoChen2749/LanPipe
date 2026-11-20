@@ -191,17 +191,6 @@ textarea {
   color: var(--accent);
 }
 
-.nav-item[aria-current="page"]::before {
-  content: "";
-  position: absolute;
-  left: -8px;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-}
-
 .nav-item svg {
   width: 20px;
   height: 20px;
@@ -276,11 +265,19 @@ textarea {
   }
 
   .nav {
+    position: relative;
     flex-direction: row;
     justify-content: space-around;
     border-right: 0;
     border-top: 1px solid var(--border);
     padding: 0;
+  }
+
+  .nav-indicator {
+    width: 24px;
+    height: 3px;
+    top: 0;
+    left: 0;
   }
 
   .nav-item {
@@ -289,15 +286,6 @@ textarea {
     padding: var(--space-1) 0;
     min-height: 56px;
     justify-content: center;
-  }
-
-  .nav-item[aria-current="page"]::before {
-    left: 20%;
-    right: 20%;
-    top: 0;
-    width: auto;
-    height: 3px;
-    bottom: auto;
   }
 
   .icon-btn {

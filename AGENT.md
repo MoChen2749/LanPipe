@@ -460,3 +460,63 @@ node tools/ui-shot.mjs 9333 docs/shot.png [0-3] [--tall]
 node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 ```
 - 发送页布局固定为三行两列（head / drop|devices / staged|direct），右列分别与拖入框、待发送卡顶对齐；动效严格按 Fluent 2 motion：100/200/250ms，standard / decelerate 缓动；页面入场动画只在路由切换时播一次，数据刷新不重播（`.content.view-enter`），`setPeers` 无变化不通知。
+
+## 16.7 Windows 11 视觉与材质规范（2026-11-21）
+
+### 16.7.1 参考来源
+
+- **图吧工具箱 CE**（[luolangaga/tubatools](https://github.com/luolangaga/tubatools)，WinUI 3 社区版）：入场动画编排（淡入 400ms + 上移 500ms，子区块 80–100ms 依次入场，卡片 scale 0.94→1）、`BackdropService`（Mica/MicaAlt/Acrylic/AcrylicThin 控制器 + Tint/Luminosity/Fallback + 跟随主题与窗口激活状态）、SelectorBar 样式（画刷过渡 83ms）。
+- **微软文档**：[Mica material](https://learn.microsoft.com/en-us/windows/apps/design/style/mica)、[Acrylic material](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic)、[Page transitions](https://learn.microsoft.com/en-us/windows/apps/develop/motion/page-transitions)。
+- **官方 Fluent 2 token**：`@fluentui/tokens`（构建期生成 CSS 变量，见 §16.6）。
+
+### 16.7.2 材质分层（实现）
+
+| 层 | 材质 | 实现 |
+| --- | --- | --- |
+| 窗口底 | Mica（Windows 11 build ≥ 22000）/ Acrylic（Win10 1809+ build ≥ 17763）/ 纯色 | Tauri `unstable` + `transparent(true)` + `Window::set_effects(EffectsBuilder)`；`LANPIPE_BACKDROP=mica|acrylic|none` 可强制覆盖 |
+| 标题栏 | 45% surface + `blur(30px)` | `.titlebar` |
+| 左侧导航 / 状态栏 | 30% surface + `blur(30px)` | `.nav` / `.statusbar` |
+| 内容卡片 | 84% surface + `blur(24px)`（悬停 90%） | `.card` |
+| 拖入框 | 58% surface + `blur(18px)` | `.dropzone` |
+| 列表行 / 设备卡 | 72% surface + `blur(14px)` | `.list-row` / `.device` |
+| 浮层（下拉、信息气泡、Toast） | 82% surface + `blur(40px)` | `.dd-pop` / `.info-pop` / `.toast` |
+
+- 启动时由 `backdrop_info` 命令返回实际生效材质（mica / acrylic / none），前端写 `document.documentElement.dataset.backdrop`；不支持材质时不加属性，保持不透明 `--bg`，**绝不出现透明露底**。
+- 降级条件（微软文档）：透明效果关闭、节电模式、低端设备、窗口失焦、系统版本不足时，材质退化为纯色——前端不感知，靠不透明兜底。
+- **禁则**：不叠多层亚克力；桌面亚克力只用于浮层，不用于大面积背景；不在亚克力上放 accent 文字；相邻亚克力面板避免拼接出缝。
+
+### 16.7.3 动效
+
+| 场景 | 时长/延迟 | 缓动 |
+| --- | --- | --- |
+| 页面切换：容器淡入 | 400ms | decelerate |
+| 页面切换：区块上移 20px | 500ms | decelerate |
+| 子区块级联 | 标题 0 / 拖入框 60ms / 待发送 120ms / 设备卡 140ms / IP 卡 220ms | decelerate |
+| 卡片入场 | 400ms，scale 0.94→1 | decelerate |
+| 移动端 Tab 切换 | 250ms，水平 ±24px | decelerate |
+| 控件 hover / pressed / 画刷 | 83–100ms | standard |
+| 下拉 / 气泡 / Toast | 200–250ms | decelerate |
+| 导航指示条 | 延迟 200ms 后 300ms 滑动 | standard |
+
+- 只在**路由切换**时播放入场（`.content.view-enter`），数据刷新（6s 设备轮询、进度）不重播；`prefers-reduced-motion` 全部关闭。
+
+### 16.7.4 基础视觉
+
+- 字体：`Segoe UI Variable Text` → `Microsoft YaHei UI`；正文 13/20，页标题 26/32，卡片标题 14/20。
+- 圆角：控件 4、卡片 8、浮层 8、胶囊 999。
+- 控件高：32（dense）/ 40（舒适）；触控目标 ≥ 44。
+- 阴影：card `shadow2`、hover `shadow4`、flyout `shadow16`（来自 Fluent token）。
+
+### 16.7.5 移动端（Fluent 2 移动端适配）
+
+- 断点：`<640` 移动端；`640–1024` 单列桌面；`≥1024` 两列。
+- `<640`：单列、页面左右 16、底部 Tab 56（+ 安全区）、Tab 栏亚克力（70% surface + blur40）、页头 44 粘性、列表行 56、触控目标 ≥ 44、Toast 在 Tab 上方、切换 Tab 水平滑动、卡片圆角 8、**没有拖入**（只保留选择文件/文件夹）。
+- 高对比 / 减少动效：跟随系统，不做强制动画。
+
+### 16.7.6 验收清单
+
+1. 不支持材质的环境（远程桌面、透明效果关闭）不出现透明露底，正文对比度 ≥ 4.5:1。
+2. 亚克力只出现在标题栏、导航、卡片、浮层；不出现相邻亚克力接缝。
+3. 页面动画只在切页触发；6s 轮询不重播；`prefers-reduced-motion` 下静止。
+4. 375×812 无横向滚动，触控目标 ≥ 44。
+5. 深色/浅色下卡片、浮层文字均可读。

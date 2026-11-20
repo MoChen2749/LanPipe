@@ -13,7 +13,8 @@ custom-protocol = ["tauri/custom-protocol"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["unstable"] }
+windows-version = "0.1"
 tauri-plugin-dialog = "2"
 lanpipe-proto = { path = "../../../crates/lanpipe-proto" }
 lanpipe-net = { path = "../../../crates/lanpipe-net" }

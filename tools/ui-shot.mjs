@@ -85,6 +85,18 @@ if (process.env.SHOT_CLICK) {
   await sleep(500);
 }
 
+if (flag === "--mobile") {
+  await send(ws, "Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 2,
+    mobile: true,
+    screenWidth: 390,
+    screenHeight: 844,
+  });
+  await sleep(500);
+}
+
 if (flag === "--tall") {
   // 临时放大视口，便于一次截完整页（应用用视口高度做滚动容器）。
   await send(ws, "Emulation.setDeviceMetricsOverride", {

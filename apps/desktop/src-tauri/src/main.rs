@@ -260,6 +260,7 @@ fn main() {
             .title(title)
             .inner_size(1040.0, 760.0)
             .min_inner_size(820.0, 560.0)
+            .transparent(true)
             .center()
             .on_page_load(|_window, payload| {
                 log(&format!("page_load {:?} {}", payload.event(), payload.url()));
@@ -269,18 +270,24 @@ fn main() {
             if let Ok(port) = std::env::var("LANPIPE_CDP") {
                 if !port.is_empty() {
                     builder = builder
-                        .additional_browser_args(&format!("--remote-debugging-port={port}"));
+                        .additional_browser_args(&format!(
+                            "--remote-debugging-port={port} --remote-allow-origins=http://127.0.0.1:{port}"
+                        ));
                 }
             }
 
             let window = builder.build();
 
             match window {
-                Ok(window) => log(&format!(
-                    "setup: window built, url={:?}, visible={:?}",
-                    window.url(),
-                    window.is_visible()
-                )),
+                Ok(window) => {
+                    let backdrop = apply_backdrop(&window);
+                    log(&format!(
+                        "setup: window built, url={:?}, visible={:?}, backdrop={backdrop}",
+                        window.url(),
+                        window.is_visible()
+                    ));
+                    let _ = tauri::Manager::manage(app, BackdropState(std::sync::Mutex::new(backdrop.to_string())));
+                }
                 Err(err) => log(&format!("setup: window build FAILED: {err}")),
             }
             Ok(())
@@ -298,6 +305,7 @@ fn main() {
             net::restart_net,
             net::start_send,
             reveal_path,
+            backdrop_info,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LanPipe");
@@ -336,4 +344,64 @@ fn reveal_path(path: String) -> Result<(), String> {
             .map_err(|err| format!("打开失败: {err}"))?;
     }
     Ok(())
+}
+
+/// 当前窗口实际生效的背景材质（mica / acrylic / none）。
+pub struct BackdropState(pub std::sync::Mutex<String>);
+
+/// 当前系统支持的材质列表（按优先级）。
+///
+/// 规则来自微软文档：
+/// - Mica 需要 Windows 11（build >= 22000），且不支持时系统只回退纯色；
+/// - Acrylic 需要 Windows 10 1809（build >= 17763）以上；
+/// - 不支持的一律用纯色，避免出现"透明窗口直接看到桌面"的问题。
+fn backdrop_candidates() -> Vec<(&'static str, tauri::window::Effect)> {
+    use tauri::window::Effect;
+    let forced = std::env::var("LANPIPE_BACKDROP").unwrap_or_default();
+    match forced.as_str() {
+        "none" => return Vec::new(),
+        "mica" => return vec![("mica", Effect::Mica)],
+        "acrylic" => return vec![("acrylic", Effect::Acrylic)],
+        _ => {}
+    }
+    let build = windows_version::OsVersion::current().build;
+    log(&format!("backdrop: os build {build}"));
+    if build >= 22000 {
+        vec![("mica", Effect::Mica), ("acrylic", Effect::Acrylic)]
+    } else if build >= 17763 {
+        vec![("acrylic", Effect::Acrylic)]
+    } else {
+        Vec::new()
+    }
+}
+
+/// 尝试给窗口应用系统材质，返回实际生效的材质名。
+fn apply_backdrop(window: &tauri::WebviewWindow) -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        use tauri::window::EffectsBuilder;
+        for (name, effect) in backdrop_candidates() {
+            let config = EffectsBuilder::new().effect(effect).build();
+            match window.set_effects(Some(config)) {
+                Ok(()) => {
+                    log(&format!("backdrop: {name} applied"));
+                    return name;
+                }
+                Err(err) => log(&format!("backdrop: {name} failed: {err}")),
+            }
+        }
+        log("backdrop: no material, use solid background");
+    }
+    let _ = window;
+    "none"
+}
+
+/// 前端启动后读取，用于启用半透明层级样式。
+#[tauri::command]
+fn backdrop_info(state: tauri::State<'_, BackdropState>) -> String {
+    state
+        .0
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_else(|_| "none".to_string())
 }

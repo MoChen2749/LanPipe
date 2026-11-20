@@ -83,6 +83,7 @@ export const api = {
   scanLastOctet: (octet: number, port?: number) =>
     invoke<PeerView[]>("scan_last_octet", { octet, port }),
   revealPath: (path: string) => invoke<void>("reveal_path", { path }),
+  backdropInfo: () => invoke<string>("backdrop_info"),
 };
 
 export const events = {

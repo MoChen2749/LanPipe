@@ -97,6 +97,27 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
 
   const nav = el("nav", { class: "nav", "aria-label": "primary" });
   let indicatorReady = false;
+  let activeRoute: Route = "send";
+
+  const placeIndicator = (animate: boolean) => {
+    const active = navButtons.get(activeRoute);
+    if (!active) return;
+    if (!animate) navIndicator.classList.add("no-anim");
+    const horizontal = window.matchMedia("(max-width: 640px)").matches;
+    if (horizontal) {
+      const offset = active.offsetLeft + active.offsetWidth / 2 - 12;
+      navIndicator.style.transform = `translateX(${offset}px)`;
+    } else {
+      const offset = active.offsetTop + active.offsetHeight / 2 - 8;
+      navIndicator.style.transform = `translateY(${offset}px)`;
+    }
+    navIndicator.classList.add("visible");
+    if (!animate) {
+      requestAnimationFrame(() => navIndicator.classList.remove("no-anim"));
+    }
+  };
+
+  window.addEventListener("resize", () => placeIndicator(false));
   const navIndicator = el("span", { class: "nav-indicator", "aria-hidden": "true" });
   nav.append(navIndicator);
   for (const item of NAV) {
@@ -134,25 +155,17 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
   return {
     content,
     setActive(route: Route) {
+      activeRoute = route;
       navButtons.forEach((button, key) => {
         button.setAttribute("aria-current", key === route ? "page" : "false");
       });
-      const active = navButtons.get(route);
-      if (!active) return;
       requestAnimationFrame(() => {
-        const offset = active.offsetTop + active.offsetHeight / 2 - 8;
         if (!indicatorReady) {
-          navIndicator.classList.add("no-anim");
-          navIndicator.style.transform = `translateY(${offset}px)`;
-          navIndicator.classList.add("visible");
-          requestAnimationFrame(() => {
-            navIndicator.classList.remove("no-anim");
-            indicatorReady = true;
-          });
+          placeIndicator(false);
+          indicatorReady = true;
           return;
         }
-        navIndicator.style.transform = `translateY(${offset}px)`;
-        navIndicator.classList.add("visible");
+        placeIndicator(true);
       });
     },
     setIdentity(name: string, shortId: string) {
