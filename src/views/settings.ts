@@ -3,13 +3,47 @@ import { el } from "../ui/dom";
 import { dropdown } from "../ui/dropdown";
 import { stepper } from "../ui/stepper";
 import { t } from "../i18n";
-import { chooseDownloadDir, resetDeviceId, saveSettings } from "../actions";
+import { chooseDownloadDir, resetDeviceId, saveSettings, toast } from "../actions";
+import { api } from "../api/tauri";
 import { getVersion } from "@tauri-apps/api/app";
 
 let version = "";
 
 export function mountSettings(container: HTMLElement): () => void {
   container.replaceChildren(build());
+  const firewallState = container.querySelector<HTMLElement>("#firewall-state");
+  const firewallButton = container.querySelector<HTMLButtonElement>("#firewall-btn");
+  const setFirewallState = (allowed: boolean | null) => {
+    if (!firewallState) return;
+    firewallState.textContent =
+      allowed === null
+        ? t("settings.firewallUnknown")
+        : allowed
+          ? t("settings.firewallOk")
+          : t("settings.firewallNone");
+    firewallState.classList.toggle("ok", allowed === true);
+  };
+  const refreshFirewall = async () => {
+    try {
+      setFirewallState(await api.firewallStatus());
+    } catch {
+      setFirewallState(null);
+    }
+  };
+  void refreshFirewall();
+  firewallButton?.addEventListener("click", async () => {
+    firewallButton.disabled = true;
+    try {
+      const allowed = await api.firewallAllow();
+      setFirewallState(allowed);
+      toast(allowed ? t("toast.firewallOk") : t("toast.firewallFail"));
+    } catch {
+      toast(t("toast.firewallFail"));
+      void refreshFirewall();
+    } finally {
+      firewallButton.disabled = false;
+    }
+  });
   void getVersion()
     .then((value) => {
       version = value;
@@ -242,9 +276,50 @@ function build(): HTMLElement {
       "div",
       { class: "card-actions" },
       el(
+        "span",
+        { class: "muted", id: "firewall-state", text: t("settings.firewallUnknown") },
+      ),
+      el(
         "button",
-        { class: "btn ghost small", type: "button", disabled: true, title: t("settings.firewallHint") },
+        {
+          class: "btn ghost small",
+          type: "button",
+          id: "firewall-btn",
+          title: t("settings.firewallHint"),
+        },
         t("settings.firewall"),
+      ),
+    ),
+  );
+
+  const autostartInput = el("input", { type: "checkbox", id: "set-autostart" }) as HTMLInputElement;
+  void api.autostartEnabled().then((on) => {
+    autostartInput.checked = on;
+  });
+  autostartInput.addEventListener("change", async () => {
+    try {
+      await api.autostartSet(autostartInput.checked);
+      toast(autostartInput.checked ? t("toast.autostartOn") : t("toast.autostartOff"));
+    } catch (err) {
+      autostartInput.checked = !autostartInput.checked;
+      toast(String(err));
+    }
+  });
+
+  const startupCard = el(
+    "section",
+    { class: "card settings-card" },
+    el("div", { class: "card-head" }, el("span", { class: "card-title", text: t("settings.group.startup") })),
+    el(
+      "label",
+      { class: "switch" },
+      autostartInput,
+      el("span", { class: "track" }),
+      el(
+        "span",
+        { class: "switch-text" },
+        el("span", { text: t("settings.autostart") }),
+        el("small", { class: "muted", text: t("settings.autostartHint") }),
       ),
     ),
   );
@@ -273,7 +348,7 @@ function build(): HTMLElement {
     "div",
     { class: "settings-view" },
     el("div", { class: "page-head" }, el("h1", { class: "page-title", text: t("settings.title") })),
-    el("div", { class: "settings-grid" }, deviceCard, transferCard, networkCard, appearanceCard, aboutCard),
+    el("div", { class: "settings-grid" }, deviceCard, transferCard, networkCard, startupCard, appearanceCard, aboutCard),
     el("div", { class: "settings-actions" }, saveButton),
   );
 }

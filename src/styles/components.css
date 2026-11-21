@@ -697,3 +697,7 @@
     transform: translate(-50%, 0);
   }
 }
+
+.muted.ok {
+  color: var(--success);
+}

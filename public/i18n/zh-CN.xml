@@ -96,6 +96,11 @@
   <string key="settings.group.network">网络</string>
   <string key="settings.group.appearance">外观与语言</string>
   <string key="settings.group.about">关于</string>
+  <string key="settings.group.startup">启动</string>
+  <string key="settings.autostart">开机时启动 LanPipe</string>
+  <string key="settings.autostartHint">只影响当前用户，可在任务管理器启动项里关闭</string>
+  <string key="toast.autostartOn">已加入开机启动</string>
+  <string key="toast.autostartOff">已取消开机启动</string>
   <string key="settings.name">设备显示名</string>
   <string key="settings.nameHint">其他设备上看到的名字，修改后立即生效。</string>
   <string key="settings.dir">接收保存目录</string>
@@ -117,8 +122,11 @@
   <string key="settings.compressAuto">自动（文本类）</string>
   <string key="settings.discovery">局域网发现</string>
   <string key="settings.discoveryHint">关闭后仍可用 IP 直连</string>
-  <string key="settings.firewall">防火墙放行</string>
-  <string key="settings.firewallHint">M1 提供一键放行</string>
+  <string key="settings.firewall">放行防火墙</string>
+  <string key="settings.firewallHint">允许其他设备连接本机；需要管理员确认</string>
+  <string key="settings.firewallUnknown">防火墙状态未知</string>
+  <string key="settings.firewallOk">已放行：其他设备可连接本机</string>
+  <string key="settings.firewallNone">未放行：其他设备可能无法发现或连接本机</string>
   <string key="settings.diagnostics">诊断</string>
   <string key="settings.theme">主题</string>
   <string key="settings.themeSystem">跟随系统</string>
@@ -137,6 +145,8 @@
   <string key="info.hint">点击地址即可复制</string>
   <string key="info.empty">未找到网络地址</string>
   <string key="toast.copied">已复制 {text}</string>
+  <string key="toast.firewallOk">防火墙已放行</string>
+  <string key="toast.firewallFail">放行失败或已取消</string>
   <string key="toast.saved">设置已保存</string>
   <string key="toast.reset">已重置完整 ID</string>
   <string key="toast.sendStarted">已开始发送</string>

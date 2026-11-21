@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod firewall;
 mod net;
 mod settings;
 
@@ -290,12 +291,29 @@ fn main() {
                         window.is_visible()
                     ));
                     let _ = tauri::Manager::manage(app, BackdropState(std::sync::Mutex::new(backdrop.to_string())));
+                    // 关闭窗口 = 收进托盘（托盘菜单里才是真正退出）
+                    let win = window.clone();
+                    window.on_window_event(move |event| {
+                        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                            api.prevent_close();
+                            let _ = win.hide();
+                        }
+                    });
+                    match build_tray(app) {
+                        Ok(()) => log("setup: tray ok"),
+                        Err(err) => log(&format!("setup: tray failed: {err}")),
+                    }
                 }
                 Err(err) => log(&format!("setup: window build FAILED: {err}")),
             }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            firewall_status,
+            firewall_allow,
+            firewall_elevated,
+            autostart_enabled,
+            autostart_set,
             settings::get_settings,
             settings::save_settings,
             settings::reset_device_id,
@@ -315,6 +333,114 @@ fn main() {
         .expect("failed to run LanPipe");
 }
 
+
+/// 托盘：左键显示主窗口，菜单可显示或退出。
+fn build_tray(app: &mut tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+    let show = MenuItem::with_id(app, "show", "显示主界面", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出 LanPipe", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
+
+    let mut builder = TrayIconBuilder::with_id("main-tray")
+        .tooltip("LanPipe")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => show_main_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        });
+
+    if let Some(icon) = app.default_window_icon().cloned() {
+        builder = builder.icon(icon);
+    }
+    builder.build(app)?;
+    Ok(())
+}
+
+fn show_main_window(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+/// 开机自启：HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+#[tauri::command]
+fn autostart_enabled() -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("reg")
+            .args([
+                "query",
+                r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+                "/v",
+                "LanPipe",
+            ])
+            .creation_flags(0x0800_0000)
+            .output()
+            .map(|out| out.status.success())
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+#[tauri::command]
+fn autostart_set(enabled: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let key = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+        let status = if enabled {
+            let exe = std::env::current_exe().map_err(|err| err.to_string())?;
+            std::process::Command::new("reg")
+                .args([
+                    "add",
+                    key,
+                    "/v",
+                    "LanPipe",
+                    "/t",
+                    "REG_SZ",
+                    "/d",
+                    &format!("\"{}\"", exe.display()),
+                    "/f",
+                ])
+                .creation_flags(0x0800_0000)
+                .status()
+        } else {
+            std::process::Command::new("reg")
+                .args(["delete", key, "/v", "LanPipe", "/f"])
+                .creation_flags(0x0800_0000)
+                .status()
+        };
+        status
+            .map_err(|err| err.to_string())
+            .and_then(|code| if code.success() { Ok(()) } else { Err("注册表写入失败".into()) })
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enabled;
+        Err("当前平台暂不支持".into())
+    }
+}
 
 /// 在系统文件管理器中显示一个路径（接收目录、已接收文件）。
 #[tauri::command]
@@ -499,6 +625,26 @@ fn tune_window_frame(window: &tauri::WebviewWindow) {
             }
         }
     }
+}
+
+/// 防火墙规则是否已写入（程序 + UDP + TCP 三条）。
+#[tauri::command]
+fn firewall_status() -> bool {
+    firewall::status()
+}
+
+/// 一键放行：弹 UAC 写入入站规则，随后返回是否成功。
+#[tauri::command]
+fn firewall_allow(app: tauri::AppHandle) -> Result<bool, String> {
+    let config = settings::snapshot(&app)?;
+    let exe = std::env::current_exe().map_err(|err| err.to_string())?;
+    firewall::allow(&exe, config.listen.udp, config.listen.tcp)
+}
+
+/// 当前进程是否以管理员身份运行（决定按钮文案）。
+#[tauri::command]
+fn firewall_elevated() -> bool {
+    firewall::is_elevated()
 }
 
 /// 当前环境是否使用系统窗口阴影（Win11 为 true）。

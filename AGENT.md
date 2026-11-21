@@ -179,11 +179,11 @@ LocalSend 用 53317 多播发现，已知失败原因：AP 隔离（客户端隔
 | 压缩 | 关 | 开/关；开启时只压小文本类文件 | M1 |
 | 网卡选择 | 全部接口 | 下拉列出活动网卡（名称/IP/速率）；切换后重建发现套接字 | M1 |
 | 发现开关 / 单播扫描 | 开 / 开 | 可关（关闭后仍可用 IP 直连） | M1 |
-| 防火墙一键放行 | — | 检测规则 → 提权添加 → 结果显示 | M1 |
+| 防火墙一键放行 | — | 检测规则 → 提权添加 → 结果显示 | M1 ✅（2026-11-21） |
 | 诊断页 | — | 网卡/子网/端口/规则/报文/可达性测试 | M1 |
 | 主题 | 跟随系统 | 浅/深/跟随 | M1 |
 | 语言 | 中文 | 中/英 | M2 |
-| 托盘 / 开机自启 | 关 | 开关 | M2 |
+| 托盘 / 开机自启 | 关 / 关 | 关闭窗口收进托盘；开机自启（HKCU Run） | M1 ✅（2026-11-21） |
 
 **配置存储**：`%APPDATA%\LanPipe\config.json`，原子写（`config.json.tmp` → rename）；解析失败回退默认并备份坏文件；**不含任何路径猜测/外部程序路径**。字段草案：
 
@@ -224,7 +224,7 @@ lanpipe/
 |---|---|---|
 | **M0（当前）** | 单机双实例 demo：拖拽 → 发现（多播/广播 + 手动 IP 兜底）→ 发送 → 进度 → 落盘校验；**设置页（接收目录 / 设备名 / 设备 ID / IP 直连 / 监听端口 / 并发流数）**；不做加密/续传/美化 | 1–2 天 |
 | M1 ✅ | 跨机双端（Windows ↔ WSL Ubuntu）、1x 磁盘、25 GB 实测、纠错重传、**断点续传 L1（journal + 跳过已完成）** | 已完成 |
-| M1（剩余） | 真实物理机 1GbE 复测、kill -9/篡改续传测试、journal TTL、小文件合批、防火墙一键放行 + 诊断页 | 进行中 |
+| M1（剩余） | 真实物理机 1GbE 复测、kill -9/篡改续传测试、journal TTL、小文件合批、诊断页 | 进行中 |
 | M2（后续） | TLS/TOFU、历史记录持久化、托盘、开机自启、macOS/Linux 构建 | 待定 |
 | M2（进行中） | GUI 重写：WinUI 3 / Fluent 2、组件化（单文件 ≤300 行）、i18n XML、深浅色、桌面三端 + 窄屏/移动端预留 | 进行中 |
 | M3 | 打包/签名/自动更新；移动端（Android/iOS）评估 | 待定 |
@@ -547,3 +547,20 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 - 材质分层（2026-11-21 最终）：
   - `body` 完全透明；`.app-root` 铺 28% 内容层；标题栏 42%、导航/状态栏 22%、卡片 72%、拖入区 40%、列表行 58%；
   - 浮层 92%→不透明（`var(--surface)`）保证可读；无 `data-backdrop` 时全部回退纯色。
+
+## 16.8 M1 系统集成（2026-11-21）
+
+- **防火墙一键放行**（`apps/desktop/src-tauri/src/firewall.rs`）：
+  - 规则名 `LanPipe`（程序）/ `LanPipe-UDP`（53310）/ `LanPipe-TCP`（53311）；
+  - 状态检测：`netsh advfirewall firewall show rule name=<name>`（`CREATE_NO_WINDOW`）；
+  - 放行：把 PowerShell 脚本写到 `%TEMP%\lanpipe-firewall.ps1`（3×delete + 3×add，`profile=any`），再用 `ShellExecuteW(runas)` 启动 `powershell -File`，轮询状态最多 12s，连续两次成立才返回成功；
+  - 已有规则直接返回，避免重复 UAC 与 delete/add 竞态；
+  - UI：设置 → 网络 → 「放行防火墙」+ 状态文本（已放行/未放行/未知）。
+- **托盘**（`build_tray`，tauri features `tray-icon`/`image-png`）：
+  - 托盘菜单：显示主界面 / 退出 LanPipe；左键单击托盘 = 显示窗口；
+  - 关闭窗口 = 收进托盘（`WindowEvent::CloseRequested` → `api.prevent_close()` + `window.hide()`），真正退出走托盘菜单或任务管理器。
+- **开机自启**（`autostart_enabled` / `autostart_set`）：
+  - 写 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `LanPipe` 值 = 当前 exe 路径，删除即取消；
+  - UI：设置 → 启动 → 「开机时启动 LanPipe」开关（只影响当前用户）。
+- **i18n 检查**：`node tools/check-i18n.mjs` 对比 `t("...")` 与 `public/i18n/zh-CN.xml`，输出 missing/unused（当前 used=116 / defined=136 / missing none）。
+- 注意：前端改动必须先 `npm run build` 再 `cargo build`，否则 dist 内嵌的仍是旧资源。
