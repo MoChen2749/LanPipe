@@ -108,6 +108,12 @@
   <!-- 历史页 -->
   <string key="history.title">历史</string>
   <string key="history.empty">暂无传输记录</string>
+  <string key="history.direction">方向</string>
+  <string key="history.peer">设备</string>
+  <string key="history.size">内容</string>
+  <string key="history.time">时间</string>
+  <string key="history.state">状态</string>
+  <string key="history.reason">原因</string>
   <string key="history.emptyHint">发送或接收完成后会记录在这里</string>
   <string key="receive.emptyHint">接收端在后台待命，收到请求会自动开始</string>
   <string key="history.done">完成</string>

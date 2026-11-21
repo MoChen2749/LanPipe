@@ -583,4 +583,5 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
   - 附近设备：当前已知对端（名称 + `#短ID · addr`）。
 - 前端：`src/views/diagnostics.ts`（单文件 <300 行），「刷新」重新拉取，「复制诊断信息」把整份 JSON 写进剪贴板（`toast.diagnostics.copied`）。
 - 单实例：`tauri-plugin-single-instance`（必须是第一个 plugin），第二次启动只聚焦已有主窗口，不新开进程；CLI 发送模式（`--send`）在已有实例运行时会被吞掉，属已知限制。
-- 后续可扩展：最近 20 条发现报文、端口连通性自检、一键导出 zip。
+- 历史条目详情：行可点击/回车展开（方向、设备、内容、时间、状态、失败原因），`aria-expanded` + 单文件 <300 行；
+- 后续可扩展：发现报文、端口连通性自检、一键导出 zip。
