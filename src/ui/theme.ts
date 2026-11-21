@@ -19,7 +19,7 @@ export function applyTheme(mode: ThemeMode): void {
     root.dataset.theme = resolve(mode);
   }
   root.style.colorScheme = resolve(mode);
-  syncMaterialBackdrop();
+  void refreshMaterial(mode);
 }
 
 /** 订阅 store 的设置变化，自动同步主题。 */
@@ -41,18 +41,28 @@ export function watchTheme(): () => void {
 }
 
 /**
- * 系统材质按系统主题取色，无法按应用主题重新调色。
- * 只有「应用主题与系统主题一致」时才启用材质；强制切到相反主题时退回纯色，
- * 避免浅色材质 + 深色 UI 的脏灰。
+ * 重新让 DWM 按「当前应用主题」选择 Mica 的浅色/深色变体。
+ * 材质由后端 set_effects 应用，前端只负责把结果写回 dataset 供 CSS 分层使用。
  */
 export function syncMaterialBackdrop(): void {
   const root = document.documentElement;
   const name = root.dataset.backdropName ?? "";
-  const mode = (getState().settings?.theme ?? "system") as ThemeMode;
-  const matchesSystem = resolve(mode) === (media.matches ? "dark" : "light");
-  if (!name || name === "none" || (mode !== "system" && !matchesSystem)) {
+  if (!name || name === "none") {
     delete root.dataset.backdrop;
     return;
   }
   root.dataset.backdrop = name;
+}
+
+/** 主题切换后重算材质（MicaLight / MicaDark），失败保持纯色。 */
+export async function refreshMaterial(mode: ThemeMode): Promise<void> {
+  const root = document.documentElement;
+  try {
+    const { api } = await import("../api/tauri");
+    const name = await api.backdropApply(mode);
+    root.dataset.backdropName = name;
+    syncMaterialBackdrop();
+  } catch {
+    delete root.dataset.backdrop;
+  }
 }

@@ -666,7 +666,7 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 
 关键教训：**不要把 `--bg` 调 alpha 叠在 Mica 上**。Mica 已按壁纸取色，叠一层带色相的低透明度页面色会变成脏灰；官方做法是页面透明 + 纯白/纯黑 alpha 层（LayerFill / CardBackgroundFill / CardStroke）。
 
-**主题与系统不一致时**：DWM 材质按系统主题取色，无法按应用主题重新调色。`src/ui/theme.ts` 的 `syncMaterialBackdrop()` 在「应用主题 ≠ 系统主题」时移除 `data-backdrop`，退回纯色，避免「浅色材质 + 深色 UI」的脏灰；系统与应用一致时（默认）才启用材质。
+**主题与系统不一致时（关键修复）**：早期做法是「应用主题 ≠ 系统主题就退回纯色」，结果浅色界面 + 深色系统时完全没有材质（用户看到的就是"没有透明"）。现在改为**按应用主题选择 Mica 变体**：`backdrop_apply(mode)` 在 build ≥ 22000 时用 `Effect::MicaLight` / `Effect::MicaDark`（对应 DWM 的浅色/深色 Mica），不再依赖系统主题；前端 `src/ui/theme.ts` 的 `refreshMaterial(mode)` 在主题切换后重新调用该命令并写回 `data-backdrop`。Acrylic（Win10）无浅深变体，保持原样。
 
 参考：
 - Color in Windows（分层：越不重要越深、越重要越亮）：<https://learn.microsoft.com/windows/apps/design/signature-experiences/color>

@@ -291,7 +291,11 @@ fn main() {
             match window {
                 Ok(window) => {
                     tune_window_frame(&window);
-                    let backdrop = apply_backdrop(&window);
+                    let startup_theme = match window.theme() {
+                        Ok(tauri::Theme::Dark) => "dark",
+                        _ => "light",
+                    };
+                    let backdrop = apply_backdrop(&window, startup_theme);
                     log(&format!(
                         "setup: window built, url={:?}, visible={:?}, backdrop={backdrop}",
                         window.url(),
@@ -334,6 +338,7 @@ fn main() {
             net::start_send,
             reveal_path,
             backdrop_info,
+            backdrop_apply,
             window_shadow,
             diagnostics,
         ])
@@ -564,19 +569,30 @@ pub struct BackdropState(pub std::sync::Mutex<String>);
 /// - Mica 需要 Windows 11（build >= 22000），且不支持时系统只回退纯色；
 /// - Acrylic 需要 Windows 10 1809（build >= 17763）以上；
 /// - 不支持的一律用纯色，避免出现"透明窗口直接看到桌面"的问题。
-fn backdrop_candidates() -> Vec<(&'static str, tauri::window::Effect)> {
+fn mica_effect(theme: &str) -> tauri::window::Effect {
+    use tauri::window::Effect;
+    // DWM 的 Mica 有明确的浅色/深色变体；用变体而不是让系统按系统主题取色，
+    // 才能让「浅色界面 + 深色系统」也拿到浅色材质（否则整窗发灰）。
+    if theme == "dark" {
+        Effect::MicaDark
+    } else {
+        Effect::MicaLight
+    }
+}
+
+fn backdrop_candidates(theme: &str) -> Vec<(&'static str, tauri::window::Effect)> {
     use tauri::window::Effect;
     let forced = std::env::var("LANPIPE_BACKDROP").unwrap_or_default();
     match forced.as_str() {
         "none" => return Vec::new(),
-        "mica" => return vec![("mica", Effect::Mica)],
+        "mica" => return vec![("mica", mica_effect(theme))],
         "acrylic" => return vec![("acrylic", Effect::Acrylic)],
         _ => {}
     }
     let build = windows_version::OsVersion::current().build;
-    log(&format!("backdrop: os build {build}"));
+    log(&format!("backdrop: os build {build}, theme {theme}"));
     if build >= 22000 {
-        vec![("mica", Effect::Mica), ("acrylic", Effect::Acrylic)]
+        vec![("mica", mica_effect(theme)), ("acrylic", Effect::Acrylic)]
     } else if build >= 17763 {
         vec![("acrylic", Effect::Acrylic)]
     } else {
@@ -585,7 +601,7 @@ fn backdrop_candidates() -> Vec<(&'static str, tauri::window::Effect)> {
 }
 
 /// 尝试给窗口应用系统材质，返回实际生效的材质名。
-fn apply_backdrop(window: &tauri::WebviewWindow) -> &'static str {
+fn apply_backdrop(window: &tauri::WebviewWindow, theme: &str) -> &'static str {
     #[cfg(target_os = "windows")]
     {
         use tauri::window::EffectsBuilder;
@@ -597,7 +613,7 @@ fn apply_backdrop(window: &tauri::WebviewWindow) -> &'static str {
             let _ = window.set_effects(None);
             return "none";
         }
-        for (name, effect) in backdrop_candidates() {
+        for (name, effect) in backdrop_candidates(theme) {
             let config = EffectsBuilder::new().effect(effect).build();
             match window.set_effects(Some(config)) {
                 Ok(()) => {
@@ -741,6 +757,27 @@ fn window_shadow() -> bool {
 }
 
 /// 前端启动后读取，用于启用半透明层级样式。
+#[tauri::command]
+fn backdrop_apply(
+    window: tauri::WebviewWindow,
+    state: tauri::State<'_, BackdropState>,
+    mode: String,
+) -> String {
+    let resolved = match mode.as_str() {
+        "dark" => "dark",
+        "light" => "light",
+        _ => match window.theme() {
+            Ok(tauri::Theme::Dark) => "dark",
+            _ => "light",
+        },
+    };
+    let name = apply_backdrop(&window, resolved);
+    if let Ok(mut guard) = state.0.lock() {
+        *guard = name.to_string();
+    }
+    name.to_string()
+}
+
 #[tauri::command]
 fn backdrop_info(state: tauri::State<'_, BackdropState>) -> String {
     state

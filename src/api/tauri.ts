@@ -84,6 +84,7 @@ export const api = {
     invoke<PeerView[]>("scan_last_octet", { octet, port }),
   revealPath: (path: string) => invoke<void>("reveal_path", { path }),
   backdropInfo: () => invoke<string>("backdrop_info"),
+  backdropApply: (mode: string) => invoke<string>("backdrop_apply", { mode }),
   windowShadow: () => invoke<boolean>("window_shadow"),
   diagnostics: () => invoke<any>("diagnostics"),
   firewallStatus: () => invoke<boolean>("firewall_status"),
