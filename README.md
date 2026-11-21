@@ -234,3 +234,18 @@ Windows 11 上如果界面「整窗发灰、只有自绘标题栏透」，先打
 - Win10（Acrylic）：页面 80%、Tab 90%、标题栏 90%+压深、卡片 92% —— 保持原方案。
 - Win11（Mica）：页面直接透出 Mica，Tab/标题栏/状态栏叠纯白 alpha，卡片用 `CardBackgroundFillColorDefault` + `CardStrokeDefault`（Fluent 官方取值）。不要把页面色按 alpha 叠到 Mica 上，会发灰。
 - 应用主题与系统主题不一致时自动退回纯色（材质按系统主题取色，无法跟随应用主题）。
+
+## 安装包（M3）
+
+| 产物 | 说明 | 构建 |
+|---|---|---|
+| `LanPipe_<ver>_x64_zh-CN.msi` | 中文安装包（装到 `C:\Program Files\LanPipe`，带卸载入口与开始菜单） | `cd apps/desktop/src-tauri && npx tauri build --bundles msi` |
+| `LanPipe_<ver>_x64-portable.zip` | 便携版（解压即用，含说明与 LICENSE） | `pwsh tools/make-portable.ps1` |
+| `target/release/lanpipe.exe` | 开发/调试用单文件 | `cargo build --release --features custom-protocol -p lanpipe` |
+
+说明：
+
+- 打安装包前必须先把前端构建出来（`npm run build`），否则内嵌的是旧页面；`tauri build` 会自己跑 release 编译。
+- `npx tauri build` 需要 `cargo` 在 PATH 上（本机为 `%USERPROFILE%\.cargo\bin`）。
+- 首次打包会下载 WiX/NSIS 工具到 `%LOCALAPPDATA%\tauri`；若 GitHub 直连超时，可先用代理下载 `wix314-binaries.zip` / `nsis-3.13.zip` 解压到该目录。
+- NSIS（per-user）目标已配置但当前暂不作为交付：本机静默安装（`/S`）返回 0 却不落盘，待查；MSI 已验证安装/卸载/运行正常。

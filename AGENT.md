@@ -671,3 +671,13 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 参考：
 - Color in Windows（分层：越不重要越深、越重要越亮）：<https://learn.microsoft.com/windows/apps/design/signature-experiences/color>
 - Fluent 颜色 token 与取值（LayerFillDefault `#80FFFFFF`/`#4D3A3A3A`、CardBackgroundFillDefault `#B2FFFFFF`/`#0DFFFFFF`、CardStrokeDefault `#0F000000`/`#1A000000`）：<https://learn.microsoft.com/visualstudio/extensibility/ux-guidelines/theme-color-token-reference>
+
+### 16.11 M3 打包与分发（2026-11-22）
+
+- **MSI（主交付）**：`bundle.targets = ["msi"]`、`bundle.windows.wix.language = ["zh-CN"]`，产物 `target/release/bundle/msi/LanPipe_0.1.0_x64_zh-CN.msi`（约 2.9 MB）。
+  - 安装位置 `C:\Program Files\LanPipe`（perMachine，需要管理员），带卸载快捷方式与「应用和功能」条目；
+  - 版本信息来自 `tauri.conf.json` 的 `version` + `bundle.publisher/copyright/shortDescription/longDescription/licenseFile`；
+  - 实测：`msiexec /i ... /qn` → 安装成功、`lanpipe.exe` 可运行、`msiexec /x {ProductCode} /qn` → 卸载干净。
+- **便携版**：`tools/make-portable.ps1`（UTF-8 **带 BOM**，否则 Windows PowerShell 5.1 会因中文把字符串解析坏）→ `target/release/bundle/portable/LanPipe_0.1.0_x64-portable.zip`（exe + LICENSE + 使用说明）。
+- **NSIS（per-user）**：配置保留（`installMode=currentUser`、简中/英文、installerIcon、startMenuFolder），但本机 `setup.exe /S` 返回 0 且不落盘（临时目录改为可写目录后才不报 NSIS Error），暂不作为交付；待查 Tauri NSIS 静默模式的 abort 原因。
+- 打包注意：先 `npm run build` 再 `npx tauri build`；`cargo` 需在 PATH；首次打包下载 WiX/NSIS 到 `%LOCALAPPDATA%\tauri`。

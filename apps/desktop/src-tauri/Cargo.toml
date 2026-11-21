@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "lanpipe"
 description = "LanPipe — 局域网零暂存文件传输"
 version.workspace = true
