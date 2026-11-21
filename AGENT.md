@@ -158,9 +158,9 @@ LocalSend 用 53317 多播发现，已知失败原因：AP 隔离（客户端隔
 
 > M2 设计草案见 [`docs/UI-DESIGN.md`](docs/UI-DESIGN.md)（WinUI 3 / Fluent 2，模块化 + i18n XML）；线框草图见 `docs/ui/wireframe-*.png`。
 
-- 主窗 900×600，可调；深/浅色跟随系统
-- 交互流：**拖入** → 文件/目录摘要（数量/总大小）→ 设备列表（名称/平台/在线）→ 点击设备 → *接收端弹确认* → 双端进度 → 完成/失败
-- 常驻入口：**设置**（齿轮）、**IP 直连**、**接收目录**（可点击直接换）、**诊断**
+- 主窗默认 1040×760（最小 820×560），可调；深浅色跟随系统或手动覆盖
+- 交互流：**拖入/选择文件** → 内容摘要（数量/总大小）→ 设备列表（显示 `#短ID`/地址/在线）→ 点击发送 → 双端进度 → 完成/失败；接收端自动接受，无确认弹窗
+- 导航：发送 / 接收 / 历史 / 诊断 / 设置（左导航；<640px 底部 Tab）；标题栏右侧信息按钮列出本机 IPv4，点击即复制
 - 错误态：同名冲突、空间不足、对端拒绝、连接断开（可重试）
 - 视觉按 Fluent 2 token（accent `#005FB8`/`#4CC2FF`、8px 圆角、Segoe UI Variable、48px 标题栏）；禁用 emoji 图标，统一内联 SVG
 
@@ -180,9 +180,9 @@ LocalSend 用 53317 多播发现，已知失败原因：AP 隔离（客户端隔
 | 网卡选择 | 全部接口 | 下拉列出活动网卡（名称/IP/速率）；切换后重建发现套接字 | M1 |
 | 发现开关 / 单播扫描 | 开 / 开 | 可关（关闭后仍可用 IP 直连） | M1 |
 | 防火墙一键放行 | — | 检测规则 → 提权添加 → 结果显示 | M1 ✅（2026-11-21） |
-| 诊断页 | — | 网卡/子网/端口/规则/报文/可达性测试 | M1 |
-| 主题 | 跟随系统 | 浅/深/跟随 | M1 |
-| 语言 | 中文 | 中/英 | M2 |
+| 诊断页 | — | 网卡/掩码/短 ID、监听端口、发现、并发流、防火墙、接收目录 + 附近设备；刷新、复制 JSON | M1 ✅（2026-11-21） |
+| 主题 | 跟随系统 | 浅/深/跟随 | M1 ✅ |
+| 语言 | 中文 | XML 语言包（`public/i18n/zh-CN.xml`）+ `t()`；英文切换预留 | M2（中文已完成） |
 | 托盘 / 开机自启 | 关 / 关 | 关闭窗口收进托盘；开机自启（HKCU Run） | M1 ✅（2026-11-21） |
 
 **配置存储**：`%APPDATA%\LanPipe\config.json`，原子写（`config.json.tmp` → rename）；解析失败回退默认并备份坏文件；**不含任何路径猜测/外部程序路径**。字段草案：
@@ -227,7 +227,7 @@ lanpipe/
 | **M1 ✅（主体）** | 跨机双端（Windows ↔ WSL Ubuntu）、1x 磁盘、25 GB 实测、纠错重传、断点续传 L1（journal + 跳过已完成）、防火墙一键放行、托盘常驻、开机自启 | 已完成（2026-11-21） |
 | M1（剩余） | 真实物理机 1GbE 复测、kill -9/篡改续传测试、journal TTL 清理、小文件合批、诊断页后续扩展（发现报文） | 进行中 |
 | **M2 ✅（主体）** | GUI 重写：WinUI 3 / Fluent 2、模块化（单文件 ≤300 行）、i18n XML、深浅色、Mica/Acrylic、级联动效、无边框自绘窗口、短 ID/全子网扫描、桌面 + 窄屏/移动端布局 | 已完成（2026-11-21，tag `v0.1.0-m2`） |
-| M2（剩余） | 历史条目详情、窄窗 <640 实机走查、Win11 真机材质/圆角复核 | 进行中 |
+| M2（剩余） | 窄窗 <640 实机走查、Win11 真机材质/圆角/投影复核 | 进行中 |
 | M3 | 打包/签名/自动更新；macOS/Linux 构建；移动端（Android/iOS）评估 | 待定 |
 
 ## 10. 验收标准（M1 结束须全部满足；2026-11-21 对照）
@@ -249,7 +249,7 @@ lanpipe/
 | 风险 | 对策 |
 |---|---|
 | 目标机缺 WebView2 | 启动检测 → 引导安装 Evergreen Runtime（`downloadBootstrapper`/`embedBootstrapper`）；或切 egui 备胎 |
-| Windows 防火墙拦截 | 首次运行检测规则 → "一键放行"（UAC 提权，仅 Private）；失败回退手动图文 + 端口自检 |
+| Windows 防火墙拦截 | 首次运行检测规则 → 「一键放行」（UAC 提权，三条规则 `profile=any`：程序 + UDP/TCP 端口）；失败回退手动 netsh 命令 + 端口自检 |
 | AP 隔离 / 多播被禁 / VPN 多网卡 | 多播+广播+单播扫描+手动 IP 四层兜底；诊断页显示网卡/子网/规则/报文 |
 | 一键放行需要管理员权限 | 只在"一键放行"按钮处提权；拒绝提权不影响本机回环测试，只影响跨机 |
 | 长路径 >260 | Rust 侧统一 `\\?\` 前缀（`dunce`/自封装） |
@@ -329,23 +329,24 @@ lanpipe/
 - **视觉基线**：Fluent Design / WinUI 3（颜色、圆角、层级、字体、动效），在 Windows 上贴近系统原生观感；macOS/Linux 沿用同一套 token，仅做字体/间距/快捷键的平台微调。
 - **技术**：Tauri v2 + TypeScript/Vite，前端不引重框架（保持单 exe 小体积、启动快）；以「设计 token + 组件函数 + 页面模块」组织，后续可平滑替换为任意框架。
 
-### 15.2 设计 token（`src/styles.css` 的 `:root`）
+### 15.2 设计 token（规划稿；实现见 §16.7 与 `src/styles/fluent-tokens.css`）
 
 | 类别 | token | 值（浅色 / 深色） |
 | --- | --- | --- |
 | 主色 | `--accent` | `#005FB8` / `#4CC2FF` |
 | 页面底 | `--bg` | `#F3F3F3` / `#1F1F1F` |
 | 卡片 | `--surface` | `#FFFFFF` / `#2B2B2B` |
-| 描边 | `--stroke` | `rgba(0,0,0,.08)` / `rgba(255,255,255,.10)` |
-| 文本 | `--text` / `--text-2` | `#1B1B1B` / `#F5F5F5`；`#5F5F5F` / `#B8B8B8` |
-| 圆角 | `--radius` | 8px（卡片）/ 6px（控件） |
-| 间距 | 4/8/12/16/24 | 统一 4 的倍数 |
+| 描边 | `--border` | `#E1E1E1` / `#3A3A3A` |
+| 文本 | `--text` / `--text-secondary` | `#1B1B1B` / `#F5F5F5`；`#5F5F5F` / `#B8B8B8` |
+| 圆角 | `--radius-card` / `--radius-control` | 8px（卡片）/ 4px（控件） |
+| 间距 | `--space-*` | 4/8/12/16/24/32（8px 网格） |
 | 字体 | `--font` | `"Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Noto Sans CJK SC", sans-serif` |
-| 动效 | `--ease` | `cubic-bezier(.2,.8,.2,1)`，尊重 `prefers-reduced-motion` |
+| 动效 | `--dur-*` / `--ease-*` | 100/150/250ms；standard `cubic-bezier(0.8,0,0.2,1)`，尊重 `prefers-reduced-motion` |
 
 ### 15.3 布局与组件
 
 - 顶部：应用图标 + 名称 + 本机「设备名 / 短 ID」胶囊。
+> 实现已调整为两列（左：拖入区 + 待发送；右：附近设备 + IP 直连；设置/诊断独立页），以 §16.2 为准。
 - 左列（主操作）：「发送」拖放区（支持点击选择）→ 已选内容摘要 → 「附近设备」列表（刷新按钮 + 设备卡，含首字母头像/名称/地址/发送按钮）→ 「IP 直连」（完整 IP 或尾号扫描）→ 「当前传输」（进度、速度、文件数、取消）。
 - 右列（设置页，分节）：常规（显示名、保存目录）、网络（UDP/TCP 端口、并发流数、压缩策略）、关于（设备 ID / 复制 / 重置、版本、诊断折叠区）。
 - 状态栏：最近一次操作结果 + 版本号。
@@ -356,7 +357,7 @@ lanpipe/
 
 | 平台 | 适配点 |
 | --- | --- |
-| Windows | Segoe UI Variable；标题栏原生；键盘 `Ctrl+,` 打开设置；拖放路径用 `onDragDropEvent` |
+| Windows | Segoe UI Variable；自绘标题栏（无边框窗口，DWM 圆角/投影）；`Ctrl+,` 打开设置；拖放路径用 `onDragDropEvent` |
 | macOS | 系统字体 `-apple-system`、更宽松的左右内边距、`Cmd+,`；窗口红绿灯区域留白 |
 | Linux | 字体回退 Noto Sans/DejaVu；不用系统标题栏装饰假设；HiDPI 用 CSS 像素 |
 | 窄窗口 | `< 900px` 单列：设置收进可折叠区；拖放区与设备列表保持可用 |
@@ -416,15 +417,15 @@ lanpipe/
 
 ### 16.6 实现状态（2026-11-21）
 
-- 前端已按模块树重写（`src/`，单文件 ≤300 行）：`styles/tokens.css`（Fluent 2 token）、`styles/base.css`（48px 标题栏 / 76px 左导航 / 状态栏，<640px 底部 Tab）、`styles/components.css`、`styles/views.css`；`ui/dom.ts`（el/svgIcon/withFocusPreserved）、`ui/format.ts`；`i18n/index.ts`（XML 语言包加载 + `t()`）；`api/tauri.ts`（命令与事件类型）；`state/store.ts`（单一状态 + 事件折叠）；`layout/shell.ts`（应用骨架）；`actions.ts`（业务动作）；`views/send|receive|history|settings.ts`。
+- 前端已按模块树重写（`src/`，单文件 ≤300 行）：`styles/tokens.css`（Fluent 2 token）、`styles/base.css`（48px 标题栏 / 76px 左导航 / 状态栏，<640px 底部 Tab）、`styles/components.css`、`styles/views.css`；`ui/dom.ts`（el/svgIcon/withFocusPreserved）、`ui/format.ts`；`i18n/index.ts`（XML 语言包加载 + `t()`）；`api/tauri.ts`（命令与事件类型）；`state/store.ts`（单一状态 + 事件折叠）；`layout/shell.ts`（应用骨架）；`actions.ts`（业务动作）；`views/send|receive|history|diagnostics|settings.ts`。
 - 多语言：`public/i18n/zh-CN.xml`（当前仅中文），key 命名 `area.component.role`，占位符 `{name}`；新增语言只需加 XML 并在 `availableLocales` 注册。
-- 交互：桌面拖放（`getCurrentWebview().onDragDropEvent` + 拖入高亮）、选择文件/文件夹、设备卡一键发送、IP 直连（短 ID 1–3 位扫全子网 / 完整 IP[:端口]）、接收页未完成横幅与保存位置、历史页、设置页（设备/传输/网络/外观/关于）。
+- 交互：桌面拖放（`getCurrentWebview().onDragDropEvent` + 拖入高亮）、选择文件/文件夹、设备卡一键发送、IP 直连（短 ID 1–3 位扫全子网 / 完整 IP[:端口]）、接收页未完成横幅与保存位置、历史页（条目可展开详情）、诊断页、设置页（设备/传输/网络/启动/外观/关于）。
 - 后端新增 `reveal_path` 命令（explorer/open/xdg-open，Windows 用 `CREATE_NO_WINDOW`）。
 - 构建顺序：先 `npm run build`（产物进 `dist/`），再 `cargo build --release --features custom-protocol -p lanpipe`；顺序反了会嵌入旧前端。
 - 标题栏右上角为「信息」按钮（原设置齿轮），点击弹出本机全部 IPv4（默认路由出口地址置顶，点击复制）；设置页仍从左侧导航进入。
-- 构建与验证截图统一用 `PrintWindow`（`PW_RENDERFULLCONTENT`）截取窗口自身渲染，不依赖屏幕位置/前台窗口，避免用户操作干扰。
+- 截图验收改用 WebView2 CDP（`LANPIPE_CDP=9333` + `tools/ui-shot.mjs`）直接取页面渲染；`PrintWindow` 无法拍到 DWM 材质，仅用于窗口外框检查。
 
-### 16.6 M2 前端实现与视觉打磨（2026-11-21）
+### 16.6.1 M2 前端实现与视觉打磨（2026-11-21）
 
 **代码结构（单文件 ≤300 行）**
 
@@ -585,3 +586,12 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 - 单实例：`tauri-plugin-single-instance`（必须是第一个 plugin），第二次启动只聚焦已有主窗口，不新开进程；CLI 发送模式（`--send`）在已有实例运行时会被吞掉，属已知限制。
 - 历史条目详情：行可点击/回车展开（方向、设备、内容、时间、状态、失败原因），`aria-expanded` + 单文件 <300 行；
 - 后续可扩展：发现报文、端口连通性自检、一键导出 zip。
+
+## 16.10 近期补充（2026-11-21 晚）
+
+- 导航五页：发送 / 接收 / 历史 / 诊断 / 设置；`src/views/diagnostics.ts`（约 150 行）用一张 `diagnostics` 命令拉全部信息。
+- 历史条目可展开：方向/设备/内容/时间/状态/失败原因；`aria-expanded`，移动端单列。
+- 设置页新增「启动」分组（开机自启开关）、网络分组底部防火墙状态与放行按钮。
+- 后端命令补充：`diagnostics`、`firewall_status`、`firewall_allow`、`firewall_elevated`、`autostart_enabled`、`autostart_set`、`backdrop_info`、`window_shadow`。
+- 单实例：`tauri-plugin-single-instance`，二次启动聚焦已有窗口；关闭窗口收进托盘。
+- i18n：`node tools/check-i18n.mjs`（missing 必须为 0；unused 仅提示）。
