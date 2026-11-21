@@ -597,3 +597,44 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 - 后端命令补充：`diagnostics`、`firewall_status`、`firewall_allow`、`firewall_elevated`、`autostart_enabled`、`autostart_set`、`backdrop_info`、`window_shadow`。
 - 单实例：`tauri-plugin-single-instance`，二次启动聚焦已有窗口；关闭窗口收进托盘。
 - i18n：`node tools/check-i18n.mjs`（missing 必须为 0；unused 仅提示）。
+
+### 16.7.8 WebView2 透明回归与自动回退（2026-11-21 查证）
+
+**现象**：Win11 上整窗发灰、内容区像盖了一层灰纸，而自绘标题栏/导航反而透得出来；同一份 CSS 在本机（Windows Server 2022 / WebView2 157）表现正常。
+
+**根因（微软 issue 已确认，不是 CSS 分层问题）**：
+
+- `MicrosoftEdge/WebView2Feedback#5481`（已关闭）：WebView2 Runtime 自 **145.x** 起丢失窗口透明，控件会绘制一层随 `COREWEBVIEW2_PREFERRED_COLOR_SCHEME` 派生的不透明底板。
+  - 144.0.3719.82 正常；146.0.3804.0 canary 仍坏；
+  - **146.0.3837.0 canary / 145.0.3800.36 beta 已修复**（微软 prija-microsoft 确认）。
+- `MicrosoftEdge/WebView2Feedback#5752`（open）：stable **154.0.4258.62** 再次回归。即使
+  `ICoreWebView2Environment10::CreateCoreWebView2ControllerWithOptions` +
+  `ICoreWebView2ControllerOptions3::SetDefaultBackgroundColor(A=0)`（创建前）
+  与 `ICoreWebView2Controller2::put_DefaultBackgroundColor(A=0)`（创建后）都设透明，
+  控件仍绘制不透明、随主题派生的底色；`SetTheme("light")` 会改变底板颜色 → 证明 alpha=0 被忽略。
+  CDP `Emulation.setDefaultBackgroundColorOverride({a:0})` 与 `--disable-gpu` 都无效。宿主即 Tauri v2 / wry。
+- 结论：**凡是 WebView2 145.x / 154.x（未打补丁的 stable），窗口透明不可用**；此时任何 `transparent(true)` + CSS 半透明都会被一层不透明底板盖住，表现为「整页发灰、只有我们自己画的层透」。
+
+**本项目的处理**：
+
+- `apps/desktop/src-tauri/src/main.rs`
+  - `fn webview_runtime() -> Option<String>`（`tauri::webview_version().ok()`）；
+  - `fn transparency_regressed() -> bool`：major 为 `145` 或 `154` 时返回 true；`LANPIPE_TRANSPARENCY=force` 可强制认为可用（调试用）；
+  - `apply_backdrop()` 开头检测：命中则 `window.set_effects(None)`、返回 `"none"`，日志
+    `backdrop: webview2 <ver> paints an opaque theme-derived base (#5752), fallback to solid`；
+  - `diagnostics` 增加 `webviewVersion` / `transparencyRegressed`，诊断页显示「WebView2 版本」「窗口透明 可用/运行时缺陷，已回退纯色」。
+- 回退时 UI 自动变成纯色（`data-backdrop` 不设置 → `materials.css` 不生效），与 app 主题一致，不再出现灰纸。
+- 微软修复后无需改代码：检测不再命中即自动恢复 Mica/Acrylic。
+
+**材质透明度规则（用户 2026-11-21 确认，深浅一致）**：
+
+| 区域 | 不透明度 | 说明 |
+|---|---|---|
+| Tab / 左导航 | 90% | 比页面更实，保持可读 |
+| 页面内容 | 80% | 比 Tab 更透，让材质透出 |
+| 标题栏 | 90% + 压深 10%（深色 14%） | 与 Tab 同透明度，但底色更深一档 |
+| 状态栏 | 90% | 与 Tab 一致 |
+| 卡片 / 列表 | 92% / 80% | 高不透明，文字优先 |
+| 浮层 | 100% | 不透明，避免透出下层文字 |
+
+**排查建议**：遇到「材质没生效」先看诊断页的 `WebView2 版本` 与 `窗口透明`；再看 `窗口材质` 是 `mica` / `acrylic` / `none`。可用 `LANPIPE_BACKDROP=mica|acrylic|none` 强制材质、`LANPIPE_TRANSPARENCY=force` 强制透明做对照。

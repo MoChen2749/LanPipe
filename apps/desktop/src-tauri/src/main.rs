@@ -370,6 +370,8 @@ fn diagnostics(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
         "version": env!("CARGO_PKG_VERSION"),
         "builtAt": BUILT_AT_SECS.trim().parse::<u64>().unwrap_or(0),
         "osBuild": windows_version::OsVersion::current().build,
+        "webviewVersion": webview_runtime().unwrap_or_default(),
+        "transparencyRegressed": transparency_regressed(),
         "backdrop": backdrop,
         "configPath": config_path,
         "stateDir": state_dir.to_string_lossy(),
@@ -528,6 +530,31 @@ fn reveal_path(path: String) -> Result<(), String> {
     Ok(())
 }
 
+
+/// WebView2 运行时版本（如 "154.0.4258.62"）；拿不到时返回 None。
+fn webview_runtime() -> Option<String> {
+    tauri::webview_version().ok()
+}
+
+/// WebView2 透明回归：145.x / 154.x 稳定版会把窗口底板画成不透明的主题色，
+/// 导致 transparent + DefaultBackgroundColor(alpha=0) 失效（整窗发灰）。
+/// 参考 MicrosoftEdge/WebView2Feedback#5481（已关闭）与 #5752（open，154.0.4258.62）。
+/// 设 `LANPIPE_TRANSPARENCY=force` 可强制按"透明可用"处理。
+fn transparency_regressed() -> bool {
+    if matches!(std::env::var("LANPIPE_TRANSPARENCY").as_deref(), Ok("force")) {
+        return false;
+    }
+    let Some(version) = webview_runtime() else {
+        return false;
+    };
+    let major: u32 = version
+        .split('.')
+        .next()
+        .and_then(|part| part.parse().ok())
+        .unwrap_or(0);
+    matches!(major, 145 | 154)
+}
+
 /// 当前窗口实际生效的背景材质（mica / acrylic / none）。
 pub struct BackdropState(pub std::sync::Mutex<String>);
 
@@ -562,6 +589,14 @@ fn apply_backdrop(window: &tauri::WebviewWindow) -> &'static str {
     #[cfg(target_os = "windows")]
     {
         use tauri::window::EffectsBuilder;
+        if transparency_regressed() {
+            let version = webview_runtime().unwrap_or_default();
+            log(&format!(
+                "backdrop: webview2 {version} paints an opaque theme-derived base (#5752), fallback to solid"
+            ));
+            let _ = window.set_effects(None);
+            return "none";
+        }
         for (name, effect) in backdrop_candidates() {
             let config = EffectsBuilder::new().effect(effect).build();
             match window.set_effects(Some(config)) {

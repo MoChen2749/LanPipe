@@ -15,6 +15,8 @@ interface Diagnostics {
   version: string;
   osBuild: number;
   builtAt?: number;
+  webviewVersion?: string;
+  transparencyRegressed?: boolean;
   backdrop: string;
   configPath?: string | null;
   stateDir: string;
@@ -72,6 +74,11 @@ export function mountDiagnostics(container: HTMLElement): () => void {
         row(t("diagnostics.version"), data.version),
         row(t("diagnostics.osBuild"), String(data.osBuild)),
     row(t("diagnostics.builtAt"), data.builtAt ? new Date(data.builtAt * 1000).toLocaleString() : "-"),
+        row(t("diagnostics.webview"), data.webviewVersion || "-"),
+        row(
+          t("diagnostics.transparency"),
+          data.transparencyRegressed ? t("diagnostics.transparencyFallback") : t("diagnostics.transparencyOk"),
+        ),
         row(t("diagnostics.backdrop"), data.backdrop || "none"),
         row(t("diagnostics.shortId"), `#${data.shortId ?? "000"}`),
         row(t("diagnostics.deviceId"), data.deviceId),

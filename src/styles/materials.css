@@ -6,9 +6,10 @@
  * - 卡片 / 列表：高不透明度填充（不加 backdrop-filter，避免创建层叠上下文）
  * - 浮层（下拉 / 气泡 / Toast）：完全不透明，避免透出下层文字
  *
- * 透明度按主题区分（2026-11-21 用户确认）：
- * - 浅色：tab/导航 90%，页面 80%
- * - 深色：导航 66%、标题栏 74%，页面 80%
+ * 透明度规则（2026-11-21 用户确认）：
+ * - Tab/导航 90%、标题栏 90%（底色压深 10%–14%）、页面 80%
+ * - 页面始终比 Tab 更透，深浅色一致
+ * - WebView2 145.x / 154.x 透明回归时自动走纯色回退（见 main.rs transparency_regressed）
  *
  * 教训：
  * - 内容层给太低（曾用 28%）时，深色壁纸下的 Mica 会透成灰纸，文字对比度崩掉；
@@ -19,20 +20,22 @@
 
 :root[data-backdrop="mica"],
 :root[data-backdrop="acrylic"] {
-  /* 默认（浅色）：页面 80%，导航 90%，标题栏 74%，状态栏 66% */
+  /* 默认（浅色）：页面 80%，Tab 90%，标题栏 90%（底色更深，见下） */
   --mat-content: 80%;
   --mat-nav: 90%;
-  --mat-titlebar: 74%;
-  --mat-status: 66%;
+  --mat-titlebar: 90%;
+  --mat-status: 90%;
+  --mat-titlebar-shade: 10%;
 }
 
 /* 深色主题：页面 80%，导航/标题栏保持更明显的材质 */
 :root[data-backdrop="mica"][data-theme="dark"],
 :root[data-backdrop="acrylic"][data-theme="dark"] {
   --mat-content: 80%;
-  --mat-nav: 66%;
-  --mat-titlebar: 74%;
-  --mat-status: 66%;
+  --mat-nav: 90%;
+  --mat-titlebar: 90%;
+  --mat-status: 90%;
+  --mat-titlebar-shade: 14%;
 }
 
 /* 跟随系统且系统是深色时，同样走深色值 */
@@ -40,9 +43,10 @@
   :root[data-backdrop="mica"]:not([data-theme="light"]):not([data-theme="dark"]),
   :root[data-backdrop="acrylic"]:not([data-theme="light"]):not([data-theme="dark"]) {
     --mat-content: 80%;
-    --mat-nav: 66%;
-    --mat-titlebar: 74%;
-    --mat-status: 66%;
+    --mat-nav: 90%;
+    --mat-titlebar: 90%;
+    --mat-status: 90%;
+    --mat-titlebar-shade: 14%;
   }
 }
 
@@ -59,7 +63,12 @@
 
 :root[data-backdrop="mica"] .titlebar,
 :root[data-backdrop="acrylic"] .titlebar {
-  background: color-mix(in srgb, var(--surface) var(--mat-titlebar), transparent);
+  background:
+    linear-gradient(
+      color-mix(in srgb, #000 var(--mat-titlebar-shade), transparent),
+      color-mix(in srgb, #000 var(--mat-titlebar-shade), transparent)
+    ),
+    color-mix(in srgb, var(--surface) var(--mat-titlebar), transparent);
   backdrop-filter: saturate(1.6) blur(30px);
   border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
   box-shadow: none;
@@ -122,13 +131,13 @@
 @media (max-width: 640px) {
   :root[data-backdrop="mica"] .nav,
   :root[data-backdrop="acrylic"] .nav {
-    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
     backdrop-filter: saturate(1.8) blur(40px);
   }
 
   :root[data-backdrop="mica"] .content,
   :root[data-backdrop="acrylic"] .content {
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
   }
 
   :root[data-backdrop="mica"] .dropzone,

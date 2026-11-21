@@ -220,3 +220,11 @@ node tools/ui-shot.mjs 9333 docs/shot.png 3 --tall
 - 左导航「诊断」：概览（版本/Build/材质/短 ID/完整 ID/配置与状态目录）、网络（逐块网卡/掩码/短 ID、监听端口、发现、并发流、防火墙、接收目录）、附近设备。
 - 「刷新」重新采集；「复制诊断信息」把整份 JSON 放进剪贴板。
 - 单实例：第二次启动只聚焦已有窗口，不会新开进程；关闭窗口收进托盘。
+
+### 已知问题：WebView2 145/154 透明回归
+
+Windows 11 上如果界面「整窗发灰、只有自绘标题栏透」，先打开 **诊断** 页看：
+
+- `WebView2 版本` 为 `145.x` 或 `154.x` 时，这是微软已知回归（[#5481](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5481)、[#5752](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5752)）：透明窗口会绘制不透明底板，`SetDefaultBackgroundColor(alpha=0)` 被忽略。
+- 程序会自动回退纯色（诊断页「窗口透明」显示「运行时缺陷，已回退纯色」），不再发灰；微软修复后自动恢复 Mica/Acrylic。
+- 调试可用 `LANPIPE_BACKDROP=mica|acrylic|none` 强制材质、`LANPIPE_TRANSPARENCY=force` 强制透明。

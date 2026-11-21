@@ -146,15 +146,28 @@ export function dropdown(opts: DropdownOptions): HTMLElement {
     }
   });
 
-  document.addEventListener("click", (event) => {
+  const onDocumentClick = (event: MouseEvent) => {
     const target = event.target as Node | null;
     if (!target) return;
     if (!root.contains(target) && !pop.contains(target)) close(false);
-  });
+  };
+  document.addEventListener("click", onDocumentClick);
 
   document.body.append(pop);
 
   const root = el("div", { class: "dd" }, button);
   syncLabel();
+
+  // 视图卸载时移除 portal 与监听，避免每次进入页面都残留一份弹出层/监听器
+  const observer = new MutationObserver(() => {
+    if (root.isConnected) return;
+    observer.disconnect();
+    document.removeEventListener("click", onDocumentClick);
+    window.removeEventListener("resize", onViewportChange);
+    window.removeEventListener("scroll", onViewportChange, true);
+    pop.remove();
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
   return root;
 }

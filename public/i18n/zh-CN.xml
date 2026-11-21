@@ -23,7 +23,11 @@
   <string key="diagnostics.version">版本</string>
   <string key="diagnostics.osBuild">系统 Build</string>
   <string key="diagnostics.builtAt">构建时间</string>
-        <string key="diagnostics.backdrop">窗口材质</string>
+        <string key="diagnostics.webview">WebView2 版本</string>
+    <string key="diagnostics.transparency">窗口透明</string>
+    <string key="diagnostics.transparencyOk">可用</string>
+    <string key="diagnostics.transparencyFallback">运行时缺陷，已回退纯色</string>
+    <string key="diagnostics.backdrop">窗口材质</string>
   <string key="diagnostics.shortId">短 ID</string>
   <string key="diagnostics.deviceId">完整 ID</string>
   <string key="diagnostics.config">配置文件</string>
