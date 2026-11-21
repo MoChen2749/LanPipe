@@ -29,7 +29,7 @@
 
 :root[data-backdrop="mica"] .titlebar,
 :root[data-backdrop="acrylic"] .titlebar {
-  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
   backdrop-filter: saturate(1.6) blur(30px);
   border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
   box-shadow: none;
@@ -37,21 +37,21 @@
 
 :root[data-backdrop="mica"] .nav,
 :root[data-backdrop="acrylic"] .nav {
-  background: color-mix(in srgb, var(--surface) 42%, transparent);
+  background: color-mix(in srgb, var(--surface) 66%, transparent);
   border-right-color: color-mix(in srgb, var(--border) 50%, transparent);
   backdrop-filter: saturate(1.4) blur(30px);
 }
 
 :root[data-backdrop="mica"] .content,
 :root[data-backdrop="acrylic"] .content {
-  /* 页面内容层：接近不透明（WinUI 里页面底色基本是不透明的），
-     只留一点材质呼吸感，保证任何壁纸/主题下都像"浅色应用"而不是灰纸 */
-  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  /* 页面内容层：完全不透明。Windows 11 的设置/资源管理器也是"框透明、内容实色"；
+     内容区一旦半透明，深色壁纸下的 Mica 会透成灰纸，文字对比度崩掉。 */
+  background: var(--bg);
 }
 
 :root[data-backdrop="mica"] .statusbar,
 :root[data-backdrop="acrylic"] .statusbar {
-  background: color-mix(in srgb, var(--surface) 42%, transparent);
+  background: color-mix(in srgb, var(--surface) 66%, transparent);
   border-top-color: color-mix(in srgb, var(--border) 50%, transparent);
   backdrop-filter: saturate(1.4) blur(30px);
 }
@@ -98,10 +98,7 @@
     backdrop-filter: saturate(1.8) blur(40px);
   }
 
-  :root[data-backdrop="mica"] .content,
-  :root[data-backdrop="acrylic"] .content {
-    background: color-mix(in srgb, var(--bg) 94%, transparent);
-  }
+
 
   :root[data-backdrop="mica"] .dropzone,
   :root[data-backdrop="acrylic"] .dropzone {

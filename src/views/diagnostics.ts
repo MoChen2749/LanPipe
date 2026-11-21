@@ -14,6 +14,7 @@ interface InterfaceRow {
 interface Diagnostics {
   version: string;
   osBuild: number;
+  builtAt?: number;
   backdrop: string;
   configPath?: string | null;
   stateDir: string;
@@ -70,6 +71,7 @@ export function mountDiagnostics(container: HTMLElement): () => void {
         t("diagnostics.overview"),
         row(t("diagnostics.version"), data.version),
         row(t("diagnostics.osBuild"), String(data.osBuild)),
+    row(t("diagnostics.builtAt"), data.builtAt ? new Date(data.builtAt * 1000).toLocaleString() : "-"),
         row(t("diagnostics.backdrop"), data.backdrop || "none"),
         row(t("diagnostics.shortId"), `#${data.shortId ?? "000"}`),
         row(t("diagnostics.deviceId"), data.deviceId),

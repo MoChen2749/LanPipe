@@ -22,7 +22,8 @@
   <string key="diagnostics.peers">附近设备</string>
   <string key="diagnostics.version">版本</string>
   <string key="diagnostics.osBuild">系统 Build</string>
-  <string key="diagnostics.backdrop">窗口材质</string>
+  <string key="diagnostics.builtAt">构建时间</string>
+        <string key="diagnostics.backdrop">窗口材质</string>
   <string key="diagnostics.shortId">短 ID</string>
   <string key="diagnostics.deviceId">完整 ID</string>
   <string key="diagnostics.config">配置文件</string>

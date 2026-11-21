@@ -10,6 +10,9 @@ use lanpipe_net::{send_paths, TransferEvent};
 
 static LOG_FILE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
+/// 编译时间（Unix 秒），用于排查用户运行的是哪一版。
+const BUILT_AT_SECS: &str = include_str!(concat!(env!("OUT_DIR"), "/built_at.txt"));
+
 fn log_path() -> std::path::PathBuf {
     let name = LOG_FILE
         .get()
@@ -365,6 +368,7 @@ fn diagnostics(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
 
     Ok(json!({
         "version": env!("CARGO_PKG_VERSION"),
+        "builtAt": BUILT_AT_SECS.trim().parse::<u64>().unwrap_or(0),
         "osBuild": windows_version::OsVersion::current().build,
         "backdrop": backdrop,
         "configPath": config_path,

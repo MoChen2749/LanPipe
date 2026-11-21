@@ -484,9 +484,9 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 | 层 | 材质 | 实现 |
 | --- | --- | --- |
 | 窗口底 | Mica（Windows 11 build ≥ 22000）/ Acrylic（Win10 1809+ build ≥ 17763）/ 纯色 | Tauri `unstable` + `transparent(true)` + `Window::set_effects(EffectsBuilder)`；`LANPIPE_BACKDROP=mica|acrylic|none` 可强制覆盖 |
-| 内容页面 | 90% `--bg`（近不透明，保证任意壁纸下可读） | `.content` |
-| 标题栏 | 52% surface + `blur(30px)` | `.titlebar` |
-| 左侧导航 / 状态栏 | 42% surface + `blur(30px)` | `.nav` / `.statusbar` |
+| 内容页面 | `var(--bg)` 完全不透明（内容区不做透明；材质只在框上） | `.content` |
+| 标题栏 | 74% surface + `blur(30px)` | `.titlebar` |
+| 左侧导航 / 状态栏 | 66% surface + `blur(30px)` | `.nav` / `.statusbar` |
 | 内容卡片 | 92% surface（悬停 96%，无 `backdrop-filter`） | `.card` |
 | 拖入框 | 70% surface | `.dropzone` |
 | 列表行 / 设备卡 | 80% surface | `.list-row` / `.device` |
@@ -589,6 +589,7 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 - 后续可扩展：发现报文、端口连通性自检、一键导出 zip。
 
 ## 16.10 近期补充（2026-11-21 晚）
+- 诊断页概览新增「构建时间」（`build.rs` 写 `OUT_DIR/built_at.txt`，`diagnostics.builtAt`），用于确认客户端实际运行的版本；改完前端必须重新 `cargo build` 才会刷新该时间。
 
 - 导航五页：发送 / 接收 / 历史 / 诊断 / 设置；`src/views/diagnostics.ts`（约 150 行）用一张 `diagnostics` 命令拉全部信息。
 - 历史条目可展开：方向/设备/内容/时间/状态/失败原因；`aria-expanded`，移动端单列。
