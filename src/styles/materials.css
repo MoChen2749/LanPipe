@@ -1,67 +1,114 @@
-/* 窗口材质（Mica / Acrylic）与半透明层 --------------------------------
- * 参考 Windows 11 应用分层（Settings / Explorer 的实际做法）：
- * - 窗口底层：Mica（壁纸取色 + 模糊）/ Acrylic（实时模糊）
- * - 标题栏 / 左导航 / 状态栏：半透明，让材质明显透出（"Windows 味"的来源）
- * - 内容区：接近不透明的页面底色，保证任意壁纸下文字都清晰
- * - 卡片 / 列表：高不透明度填充（不加 backdrop-filter，避免创建层叠上下文）
- * - 浮层（下拉 / 气泡 / Toast）：完全不透明，避免透出下层文字
+/* 窗口材质（Mica / Acrylic）分层 ---------------------------------------
+ * 两套配色策略：Win10 用 Acrylic、Win11 用 Mica，观感差别很大，必须分开调。
  *
- * 透明度规则（2026-11-21 用户确认）：
- * - Tab/导航 90%、标题栏 90%（底色压深 10%–14%）、页面 80%
- * - 页面始终比 Tab 更透，深浅色一致
- * - WebView2 145.x / 154.x 透明回归时自动走纯色回退（见 main.rs transparency_regressed）
+ * - Acrylic（Win10，build >= 17763）：沿用已确认的那套
+ *   页面 80% --bg、Tab 90% --surface、标题栏 90% + 压深、卡片 92%。
+ * - Mica（Win11，build >= 22000）：按 Windows 11 设置页的做法
+ *   页面直接透出 Mica；Tab / 标题栏 / 状态栏叠纯白（浅色）或纯白微光（深色）alpha；
+ *   卡片用 CardBackgroundFillColorDefault（#B2FFFFFF / #0DFFFFFF）+ CardStrokeDefault。
+ *   —— 关键：不再把 --bg 调 alpha 叠在 Mica 上，那样会发灰。
  *
- * 教训：
- * - 内容层给太低（曾用 28%）时，深色壁纸下的 Mica 会透成灰纸，文字对比度崩掉；
- * - 卡片不要加 backdrop-filter —— 它会创建层叠上下文，
- *   让卡片内部的下拉浮层被后面的兄弟卡片盖住。
- * 仅在 data-backdrop="mica|acrylic" 时启用；不支持材质的环境保持纯色。
+ * 数值来源（Windows 11 Fluent theme resources，经 VS 主题 token 参考交叉核对）：
+ * LayerFillDefault          #80FFFFFF / #4D3A3A3A
+ * CardBackgroundFillColorDefault #B2FFFFFF / #0DFFFFFF
+ * CardStrokeDefault         #0F000000 / #1A000000
+ * SolidBackgroundFillBase   #F3F3F3 / #202020
+ *
+ * 通用约束：
+ * - 卡片不加 backdrop-filter（会创建层叠上下文，使卡片内浮层被兄弟卡片盖住）；
+ * - WebView2 145.x / 154.x 有透明回归，main.rs 检测后回退纯色，不加载本文件。
  */
 
-:root[data-backdrop="mica"],
+/* ============ Acrylic（Win10）============ */
 :root[data-backdrop="acrylic"] {
-  /* 默认（浅色）：页面 80%，Tab 90%，标题栏 90%（底色更深，见下） */
   --mat-content: 80%;
   --mat-nav: 90%;
   --mat-titlebar: 90%;
   --mat-status: 90%;
   --mat-titlebar-shade: 10%;
+  --mat-card: 92%;
+  --mat-card-hover: 96%;
 }
 
-/* 深色主题：页面 80%，导航/标题栏保持更明显的材质 */
-:root[data-backdrop="mica"][data-theme="dark"],
 :root[data-backdrop="acrylic"][data-theme="dark"] {
   --mat-content: 80%;
   --mat-nav: 90%;
   --mat-titlebar: 90%;
   --mat-status: 90%;
   --mat-titlebar-shade: 14%;
+  --mat-card: 92%;
+  --mat-card-hover: 96%;
 }
 
-/* 跟随系统且系统是深色时，同样走深色值 */
 @media (prefers-color-scheme: dark) {
-  :root[data-backdrop="mica"]:not([data-theme="light"]):not([data-theme="dark"]),
   :root[data-backdrop="acrylic"]:not([data-theme="light"]):not([data-theme="dark"]) {
     --mat-content: 80%;
     --mat-nav: 90%;
     --mat-titlebar: 90%;
     --mat-status: 90%;
     --mat-titlebar-shade: 14%;
+    --mat-card: 92%;
+    --mat-card-hover: 96%;
   }
 }
 
-:root[data-backdrop="mica"] body,
-:root[data-backdrop="acrylic"] body {
-  background: transparent;
+/* ============ Mica（Win11）============ */
+:root[data-backdrop="mica"] {
+  --mat-page: transparent;
+  --mat-nav: rgba(255, 255, 255, 0.5);
+  --mat-titlebar: rgba(255, 255, 255, 0.5);
+  --mat-titlebar-shade: rgba(0, 0, 0, 0.06);
+  --mat-status: rgba(255, 255, 255, 0.5);
+  --mat-card: rgba(255, 255, 255, 0.7);
+  --mat-card-border: rgba(0, 0, 0, 0.06);
+  --mat-subtle: rgba(255, 255, 255, 0.3);
+  --mat-row: rgba(255, 255, 255, 0.42);
 }
 
-/* 应用根节点透明，让材质在标题栏/导航/状态栏直接透出；内容区自己铺底色 */
+:root[data-backdrop="mica"][data-theme="dark"] {
+  --mat-page: transparent;
+  --mat-nav: rgba(255, 255, 255, 0.04);
+  --mat-titlebar: rgba(255, 255, 255, 0.04);
+  --mat-titlebar-shade: rgba(0, 0, 0, 0.12);
+  --mat-status: rgba(255, 255, 255, 0.04);
+  --mat-card: rgba(255, 255, 255, 0.05);
+  --mat-card-border: rgba(0, 0, 0, 0.12);
+  --mat-subtle: rgba(255, 255, 255, 0.025);
+  --mat-row: rgba(255, 255, 255, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-backdrop="mica"]:not([data-theme="light"]):not([data-theme="dark"]) {
+    --mat-page: transparent;
+    --mat-nav: rgba(255, 255, 255, 0.04);
+    --mat-titlebar: rgba(255, 255, 255, 0.04);
+    --mat-titlebar-shade: rgba(0, 0, 0, 0.12);
+    --mat-status: rgba(255, 255, 255, 0.04);
+    --mat-card: rgba(255, 255, 255, 0.05);
+    --mat-card-border: rgba(0, 0, 0, 0.12);
+    --mat-subtle: rgba(255, 255, 255, 0.025);
+    --mat-row: rgba(255, 255, 255, 0.04);
+  }
+}
+
+/* ============ 通用：透明底 ============ */
+:root[data-backdrop="mica"] body,
+:root[data-backdrop="acrylic"] body,
 :root[data-backdrop="mica"] .app-root,
 :root[data-backdrop="acrylic"] .app-root {
   background: transparent;
 }
 
-:root[data-backdrop="mica"] .titlebar,
+/* ---------- Acrylic：原来的分层 ---------- */
+:root[data-backdrop="acrylic"] .content {
+  background: color-mix(in srgb, var(--bg) var(--mat-content), transparent);
+}
+
+:root[data-backdrop="acrylic"] .nav {
+  background: color-mix(in srgb, var(--surface) var(--mat-nav), transparent);
+  backdrop-filter: saturate(1.6) blur(24px);
+}
+
 :root[data-backdrop="acrylic"] .titlebar {
   background:
     linear-gradient(
@@ -69,54 +116,71 @@
       color-mix(in srgb, #000 var(--mat-titlebar-shade), transparent)
     ),
     color-mix(in srgb, var(--surface) var(--mat-titlebar), transparent);
-  backdrop-filter: saturate(1.6) blur(30px);
-  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
-  box-shadow: none;
 }
 
-:root[data-backdrop="mica"] .nav,
-:root[data-backdrop="acrylic"] .nav {
-  background: color-mix(in srgb, var(--surface) var(--mat-nav), transparent);
-  border-right-color: color-mix(in srgb, var(--border) 50%, transparent);
-  backdrop-filter: saturate(1.4) blur(30px);
-}
-
-:root[data-backdrop="mica"] .content,
-:root[data-backdrop="acrylic"] .content {
-  background: color-mix(in srgb, var(--bg) var(--mat-content), transparent);
-}
-
-:root[data-backdrop="mica"] .statusbar,
 :root[data-backdrop="acrylic"] .statusbar {
   background: color-mix(in srgb, var(--surface) var(--mat-status), transparent);
-  border-top-color: color-mix(in srgb, var(--border) 50%, transparent);
-  backdrop-filter: saturate(1.4) blur(30px);
 }
 
-/* 卡片：高不透明度，文字优先；不加 backdrop-filter（见文件头） */
-:root[data-backdrop="mica"] .card,
 :root[data-backdrop="acrylic"] .card {
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: color-mix(in srgb, var(--surface) var(--mat-card), transparent);
 }
 
-:root[data-backdrop="mica"] .card:hover,
 :root[data-backdrop="acrylic"] .card:hover {
-  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  background: color-mix(in srgb, var(--surface) var(--mat-card-hover), transparent);
 }
 
-:root[data-backdrop="mica"] .dropzone,
-:root[data-backdrop="acrylic"] .dropzone {
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+/* ---------- Mica：Windows 11 设置页做法 ---------- */
+:root[data-backdrop="mica"] .content {
+  background: var(--mat-page);
+}
+
+:root[data-backdrop="mica"] .titlebar {
+  background:
+    linear-gradient(var(--mat-titlebar-shade), var(--mat-titlebar-shade)),
+    var(--mat-titlebar);
+  border-bottom-color: var(--mat-card-border);
+}
+
+:root[data-backdrop="mica"] .nav {
+  background: var(--mat-nav);
+  backdrop-filter: saturate(1.6) blur(30px);
+  border-right-color: var(--mat-card-border);
+}
+
+:root[data-backdrop="mica"] .statusbar {
+  background: var(--mat-status);
+  backdrop-filter: saturate(1.6) blur(24px);
+  border-top-color: var(--mat-card-border);
+}
+
+:root[data-backdrop="mica"] .card {
+  background: var(--mat-card);
+  border-color: var(--mat-card-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+:root[data-backdrop="mica"] .card:hover {
+  background: var(--mat-card);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+:root[data-backdrop="mica"] .dropzone {
+  background: var(--mat-subtle);
+  border-color: var(--mat-card-border);
 }
 
 :root[data-backdrop="mica"] .list-row,
-:root[data-backdrop="acrylic"] .list-row,
-:root[data-backdrop="mica"] .device,
-:root[data-backdrop="acrylic"] .device {
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
+:root[data-backdrop="mica"] .device {
+  background: var(--mat-row);
 }
 
-/* 浮层完全不透明，保证可读，且不叠在别的材质上 */
+:root[data-backdrop="mica"] .list-row:hover,
+:root[data-backdrop="mica"] .device:hover {
+  background: var(--mat-card);
+}
+
+/* ============ 浮层：不透明 ============ */
 :root[data-backdrop="mica"] .dd-pop,
 :root[data-backdrop="acrylic"] .dd-pop,
 :root[data-backdrop="mica"] .info-pop,
@@ -127,28 +191,27 @@
   backdrop-filter: none;
 }
 
-/* 移动端底部 Tab 用更明显的 Acrylic，浮在内容之上 */
+/* ============ 移动端 ============ */
 @media (max-width: 640px) {
-  :root[data-backdrop="mica"] .nav,
   :root[data-backdrop="acrylic"] .nav {
     background: color-mix(in srgb, var(--surface) 92%, transparent);
     backdrop-filter: saturate(1.8) blur(40px);
   }
 
-  :root[data-backdrop="mica"] .content,
   :root[data-backdrop="acrylic"] .content {
     background: color-mix(in srgb, var(--bg) 86%, transparent);
   }
 
-  :root[data-backdrop="mica"] .dropzone,
-  :root[data-backdrop="acrylic"] .dropzone {
-    background: transparent;
-    backdrop-filter: none;
-    border: 0;
+  :root[data-backdrop="mica"] .nav {
+    background: var(--mat-card);
+    backdrop-filter: saturate(1.8) blur(40px);
+    border-top-color: var(--mat-card-border);
   }
-}
 
-/* 无材质环境（Win10 早期 / 远程桌面 / 关闭透明效果）：不透明回退 */
-:root:not([data-backdrop]) body {
-  background: var(--bg);
+  :root[data-backdrop="acrylic"] .dropzone,
+  :root[data-backdrop="mica"] .dropzone {
+    background: transparent;
+    border: 0;
+    backdrop-filter: none;
+  }
 }

@@ -12,7 +12,7 @@ import { mountDiagnostics } from "./views/diagnostics";
 import { applyTransferEvent, getState, setPeers, subscribe } from "./state/store";
 import { loadBootstrap, refreshPeers, setToastHandler, stagePaths } from "./actions";
 import { api, events } from "./api/tauri";
-import { watchTheme } from "./ui/theme";
+import { syncMaterialBackdrop, watchTheme } from "./ui/theme";
 
 let shell: Shell;
 let cleanup: (() => void) | null = null;
@@ -97,9 +97,10 @@ function navigate(route: Route): void {
 async function applyBackdrop(): Promise<void> {
   try {
     const info = await api.backdropInfo();
-    if (info && info !== "none") {
-      document.documentElement.dataset.backdrop = info;
-    }
+    // 先记住系统支持的材质，再由 syncMaterialBackdrop 决定是否启用
+    // （应用主题与系统主题不一致时不启用，避免脏灰）
+    document.documentElement.dataset.backdropName = info || "none";
+    syncMaterialBackdrop();
   } catch {
     /* 浏览器预览 / 旧后端忽略 */
   }

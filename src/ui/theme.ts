@@ -19,6 +19,7 @@ export function applyTheme(mode: ThemeMode): void {
     root.dataset.theme = resolve(mode);
   }
   root.style.colorScheme = resolve(mode);
+  syncMaterialBackdrop();
 }
 
 /** 订阅 store 的设置变化，自动同步主题。 */
@@ -37,4 +38,21 @@ export function watchTheme(): () => void {
     media.removeEventListener("change", onSystem);
     unsub();
   };
+}
+
+/**
+ * 系统材质按系统主题取色，无法按应用主题重新调色。
+ * 只有「应用主题与系统主题一致」时才启用材质；强制切到相反主题时退回纯色，
+ * 避免浅色材质 + 深色 UI 的脏灰。
+ */
+export function syncMaterialBackdrop(): void {
+  const root = document.documentElement;
+  const name = root.dataset.backdropName ?? "";
+  const mode = (getState().settings?.theme ?? "system") as ThemeMode;
+  const matchesSystem = resolve(mode) === (media.matches ? "dark" : "light");
+  if (!name || name === "none" || (mode !== "system" && !matchesSystem)) {
+    delete root.dataset.backdrop;
+    return;
+  }
+  root.dataset.backdrop = name;
 }
