@@ -131,6 +131,16 @@ pub struct SettingsState {
     path: Mutex<Option<PathBuf>>,
 }
 
+impl SettingsState {
+    /// 当前生效的配置文件路径（诊断页展示用）。
+    pub fn path_string(&self) -> Option<String> {
+        self.path
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|path| path.to_string_lossy().to_string()))
+    }
+}
+
 /// 应用启动时加载配置。优先 `%APPDATA%\LanPipe[-实例]\config.json`；
 /// 该位置不可写时（便携模式、受限权限）回退到 exe 同目录的 `config.json`。
 /// 损坏的配置会备份为 `config.json.bad` 并回退默认值。

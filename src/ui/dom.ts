@@ -92,6 +92,7 @@ export const icons = {
   chevronDown: ["M6 9l6 6 6 -6"],
   chevronUp: ["M6 15l6 -6 6 6"],
   alert: ["M12 4l9 16H3z", "M12 10v4", "M12 17v.5"],
+  pulse: ["M3 12h4l2 6 4 -12 2 6h6"],
   minimize: ["M5 12h14"],
   maximize: ["M5 5h14v14H5z"],
   restore: ["M8 8h11v11H8z", "M5 16V5h11"],

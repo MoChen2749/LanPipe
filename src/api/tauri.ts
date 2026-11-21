@@ -85,6 +85,7 @@ export const api = {
   revealPath: (path: string) => invoke<void>("reveal_path", { path }),
   backdropInfo: () => invoke<string>("backdrop_info"),
   windowShadow: () => invoke<boolean>("window_shadow"),
+  diagnostics: () => invoke<any>("diagnostics"),
   firewallStatus: () => invoke<boolean>("firewall_status"),
   autostartEnabled: () => invoke<boolean>("autostart_enabled"),
   autostartSet: (enabled: boolean) => invoke<void>("autostart_set", { enabled }),

@@ -8,6 +8,7 @@ import { mountSend } from "./views/send";
 import { mountReceive } from "./views/receive";
 import { mountHistory } from "./views/history";
 import { mountSettings } from "./views/settings";
+import { mountDiagnostics } from "./views/diagnostics";
 import { applyTransferEvent, getState, setPeers, subscribe } from "./state/store";
 import { loadBootstrap, refreshPeers, setToastHandler, stagePaths } from "./actions";
 import { api, events } from "./api/tauri";
@@ -65,7 +66,7 @@ async function main(): Promise<void> {
   }
 }
 
-const ROUTES: Route[] = ["send", "receive", "history", "settings"];
+const ROUTES: Route[] = ["send", "receive", "history", "diagnostics", "settings"];
 let currentRoute: Route = "send";
 
 function navigate(route: Route): void {
@@ -89,6 +90,7 @@ function navigate(route: Route): void {
   if (route === "send") cleanup = mountSend(shell.content);
   else if (route === "receive") cleanup = mountReceive(shell.content, navigate);
   else if (route === "history") cleanup = mountHistory(shell.content);
+  else if (route === "diagnostics") cleanup = mountDiagnostics(shell.content);
   else cleanup = mountSettings(shell.content);
 }
 

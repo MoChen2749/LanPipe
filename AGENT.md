@@ -89,7 +89,7 @@
 | 事项 | 设计 |
 |---|---|
 | 监听端口 | 53310 / 53311（均 >1024）→ **无需管理员**；WebView2 也不需要 |
-| Windows 防火墙 | 首次运行检测入站规则；提供**"一键放行"**（UAC 提权执行 `netsh advfirewall firewall add rule`，只对 **Private** 配置文件放行 TCP 53311 + UDP 53310）；用户拒绝提权则回退图文手动步骤 + **端口连通性自检** |
+| Windows 防火墙 | **已实现**（`firewall.rs`，2026-11-21）：检测三条规则 `LanPipe` / `LanPipe-UDP` / `LanPipe-TCP`；「一键放行」用 UAC 提权 PowerShell 脚本 `netsh advfirewall` 写规则（`profile=any`，便于跨网段）；已有规则直接跳过；用户拒绝提权则提示失败（后续补图文手动步骤 + 端口自检） |
 | 网络位置 | 检测到 Public 网络时提示切换 Private（提示，不静默改系统设置） |
 | 写目标目录 | 默认 `%USERPROFILE%\Downloads\LanPipe`，可改；权限失败按文件上报，不请求管理员 |
 | 端口冲突 | 自动换端口并写入 announce 报文，不写死 |
@@ -213,23 +213,24 @@ lanpipe/
 ├─ crates/
 │  ├─ lanpipe-proto/
 │  └─ lanpipe-net/
+├─ tools/                    # 开发/验收脚本（截图、i18n 检查、线框图）
 └─ apps/desktop/
-   ├─ src/                   # 前端（含 settings 页）
-   └─ src-tauri/             # Rust/Tauri
+   ├─ src/                   # 前端（模块化：api/state/layout/views/components/ui/i18n/styles）
+   └─ src-tauri/             # Rust/Tauri（main.rs / net.rs / settings.rs / firewall.rs）
 ```
 
 ## 9. 里程碑
 
-| 阶段 | 内容 | 预估 |
+| 阶段 | 内容 | 状态 |
 |---|---|---|
-| **M0（当前）** | 单机双实例 demo：拖拽 → 发现（多播/广播 + 手动 IP 兜底）→ 发送 → 进度 → 落盘校验；**设置页（接收目录 / 设备名 / 设备 ID / IP 直连 / 监听端口 / 并发流数）**；不做加密/续传/美化 | 1–2 天 |
-| M1 ✅ | 跨机双端（Windows ↔ WSL Ubuntu）、1x 磁盘、25 GB 实测、纠错重传、**断点续传 L1（journal + 跳过已完成）** | 已完成 |
-| M1（剩余） | 真实物理机 1GbE 复测、kill -9/篡改续传测试、journal TTL、小文件合批、诊断页 | 进行中 |
-| M2（后续） | TLS/TOFU、历史记录持久化、托盘、开机自启、macOS/Linux 构建 | 待定 |
-| M2（进行中） | GUI 重写：WinUI 3 / Fluent 2、组件化（单文件 ≤300 行）、i18n XML、深浅色、桌面三端 + 窄屏/移动端预留 | 进行中 |
-| M3 | 打包/签名/自动更新；移动端（Android/iOS）评估 | 待定 |
+| **M0 ✅** | 单机双实例 demo：拖拽 → 发现（多播/广播 + 手动 IP 兜底）→ 发送 → 进度 → 落盘校验；设置页；不做加密/续传/美化 | 已完成（2026-11-19） |
+| **M1 ✅（主体）** | 跨机双端（Windows ↔ WSL Ubuntu）、1x 磁盘、25 GB 实测、纠错重传、断点续传 L1（journal + 跳过已完成）、防火墙一键放行、托盘常驻、开机自启 | 已完成（2026-11-21） |
+| M1（剩余） | 真实物理机 1GbE 复测、kill -9/篡改续传测试、journal TTL 清理、小文件合批、诊断页后续扩展（发现报文） | 进行中 |
+| **M2 ✅（主体）** | GUI 重写：WinUI 3 / Fluent 2、模块化（单文件 ≤300 行）、i18n XML、深浅色、Mica/Acrylic、级联动效、无边框自绘窗口、短 ID/全子网扫描、桌面 + 窄屏/移动端布局 | 已完成（2026-11-21，tag `v0.1.0-m2`） |
+| M2（剩余） | 历史条目详情、窄窗 <640 实机走查、Win11 真机材质/圆角复核 | 进行中 |
+| M3 | 打包/签名/自动更新；macOS/Linux 构建；移动端（Android/iOS）评估 | 待定 |
 
-## 10. 验收标准（M1 结束须全部满足）
+## 10. 验收标准（M1 结束须全部满足；2026-11-21 对照）
 
 - **功能**：拖拽文件/目录、自动发现、接受/拒绝、进度、取消、失败可重试、落盘文件数与字节完全一致
 - **设置**：目录/设备名/ID/IP 直连可改可存；重启后保持；**关闭发现后 IP 直连仍能发送**；改目录立即生效
@@ -237,7 +238,11 @@ lanpipe/
 - **性能**：1GbE 混合目录 ≥ 100 MiB/s（大文件主导场景）；1 万小文件 ≥ 1,800 文件/s
 - **资源**：空闲 RAM < 150 MB；单 exe 双击无控制台窗口
 - **平台**：Win10 1903+/Win11（WebView2）、macOS 12+、Ubuntu 22.04+（WebKitGTK）
-- **代码**：`cargo clippy -- -D warnings` 通过；proto/net 有单元测试
+- **代码**：`cargo clippy -- -D warnings` 通过；proto/net 有单元测试（✅ 2026-11-21 全绿：e2e / resume / resync / proto 单测）
+
+对照结果：
+- ✅ 已达成：功能全链路、设置持久化、零额外磁盘（.lp-part 直写 + rename）、Win10/Win11 单 exe、clippy/test 全绿、断点续传、防火墙/托盘/自启
+- ⏳ 待补：真实物理机 1GbE 吞吐（此前为 WSL 虚拟网卡）、1 万小文件吞吐、macOS/Linux 构建与签名
 
 ## 11. 风险与对策
 
@@ -261,17 +266,21 @@ lanpipe/
 - 无遥测；日志仅本地；不上传任何设备信息
 - Rust：`rustfmt` + `clippy -D warnings`；前端 M1 起加 prettier/eslint
 - 标识符英文、注释中文可
-- 单实例运行（`tauri-plugin-single-instance`）
+- 单实例运行（`tauri-plugin-single-instance`，二次启动只聚焦已有窗口）
 - 设置项读写集中在 `settings` 模块，**UI 不直接改 config 文件**
+- 前端改动必须先 `npm run build` 再 `cargo build`（dist 内嵌进 exe，反序会打包旧资源）
+- UI 文案只走 `t("key")` + `public/i18n/zh-CN.xml`；改完跑 `node tools/check-i18n.mjs`（missing 必须为 0）
+- 前端验收用 CDP：`LANPIPE_CDP=9333` 启动后 `node tools/ui-shot.mjs 9333 out.png [navIndex] [--tall|--mobile]`、`node tools/ui-eval.mjs 9333 "<表达式>"`（不截屏幕）
 - 生产构建必须 `cargo build --release --features custom-protocol`（缺少该 feature 会进入 dev 模式、加载 devUrl 导致白屏）；开发模式不带
 - 本开发机沙箱限制：工作区内 `F:\Projects` 的 exe 只能写工作区路径，须从 `%LOCALAPPDATA%\Programs\LanPipe\LanPipe.exe` 运行（`build.bat` 自动部署）
 
-## 13. 待确认（不阻塞 M0）
+## 13. 待确认（已决，2026-11-21 更新）
 
-1. 产品名 **LanPipe** 是否保留（可随时改，仅影响 exe 名/端口文档）
-2. GUI 重写的范围：只换视觉，还是同时做组件库/多窗口/国际化？（当前决定：先做视觉+组件化+桌面三端适配）
-3. 是否需要**托盘常驻 / 开机自启**（影响生命周期与 M2 排期）
-4. 设备 ID 重置后，历史 `recentPeers` 是否需要一并清空
+1. 产品名 **LanPipe**：保留。
+2. GUI 范围：WinUI 3 / Fluent 2 视觉 + 组件化 + i18n XML + 桌面三端与窄屏/移动端预留（已落地，见 §16）。
+3. 托盘 / 开机自启：**要**，已实现（关闭窗口收进托盘；HKCU Run 自启）。
+4. 重置设备 ID：只换 UUID，保留 `recentPeers` 与历史（对端需要重新识别本机）。
+5. 不做 LocalSend 协议兼容（2026-11-20 决定，长期有效）。
 
 ## 14. M0 实现记录（2026-11-19）
 
@@ -564,3 +573,14 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
   - UI：设置 → 启动 → 「开机时启动 LanPipe」开关（只影响当前用户）。
 - **i18n 检查**：`node tools/check-i18n.mjs` 对比 `t("...")` 与 `public/i18n/zh-CN.xml`，输出 missing/unused（当前 used=116 / defined=136 / missing none）。
 - 注意：前端改动必须先 `npm run build` 再 `cargo build`，否则 dist 内嵌的仍是旧资源。
+
+## 16.9 诊断页与单实例（2026-11-21）
+
+- 导航第 5 项「诊断」（桌面左导航 / 移动端底部 Tab，共 5 个），把 `AGENT §4.2` 里的诊断诉求先做成一页可复制的最小版本。
+- 后端 `diagnostics` 命令（`main.rs` + `net::interface_details`）返回：
+  - 概览：版本、系统 Build、窗口材质（mica/acrylic/none）、短 ID、完整 ID、配置文件路径、状态目录 + 续传记录数；
+  - 网络：逐块网卡（名称 / IPv4/前缀 / 掩码 / 短 ID）、监听端口（实际绑定值）、发现开关、并发流、防火墙状态、接收目录；
+  - 附近设备：当前已知对端（名称 + `#短ID · addr`）。
+- 前端：`src/views/diagnostics.ts`（单文件 <300 行），「刷新」重新拉取，「复制诊断信息」把整份 JSON 写进剪贴板（`toast.diagnostics.copied`）。
+- 单实例：`tauri-plugin-single-instance`（必须是第一个 plugin），第二次启动只聚焦已有主窗口，不新开进程；CLI 发送模式（`--send`）在已有实例运行时会被吞掉，属已知限制。
+- 后续可扩展：最近 20 条发现报文、端口连通性自检、一键导出 zip。

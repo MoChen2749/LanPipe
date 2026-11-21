@@ -15,6 +15,33 @@
   <string key="nav.send">发送</string>
   <string key="nav.receive">接收</string>
   <string key="nav.history">历史</string>
+  <string key="nav.diagnostics">诊断</string>
+  <string key="diagnostics.title">诊断</string>
+  <string key="diagnostics.overview">概览</string>
+  <string key="diagnostics.network">网络</string>
+  <string key="diagnostics.peers">附近设备</string>
+  <string key="diagnostics.version">版本</string>
+  <string key="diagnostics.osBuild">系统 Build</string>
+  <string key="diagnostics.backdrop">窗口材质</string>
+  <string key="diagnostics.shortId">短 ID</string>
+  <string key="diagnostics.deviceId">完整 ID</string>
+  <string key="diagnostics.config">配置文件</string>
+  <string key="diagnostics.stateDir">状态目录</string>
+  <string key="diagnostics.journals">个续传记录</string>
+  <string key="diagnostics.ports">监听端口</string>
+  <string key="diagnostics.discovery">局域网发现</string>
+  <string key="diagnostics.streams">并发流</string>
+  <string key="diagnostics.firewall">防火墙</string>
+  <string key="diagnostics.downloadDir">接收目录</string>
+  <string key="diagnostics.on">已开启</string>
+  <string key="diagnostics.off">已关闭</string>
+  <string key="diagnostics.noInterface">没有可用网卡</string>
+  <string key="diagnostics.noPeers">暂无设备</string>
+  <string key="diagnostics.refresh">刷新</string>
+  <string key="diagnostics.copy">复制诊断信息</string>
+  <string key="diagnostics.copied">诊断信息已复制</string>
+  <string key="diagnostics.error">诊断失败</string>
+  <string key="diagnostics.errorHint">错误信息</string>
   <string key="nav.settings">设置</string>
 
   <!-- 状态栏 -->

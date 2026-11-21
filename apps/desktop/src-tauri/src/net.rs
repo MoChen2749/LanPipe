@@ -275,6 +275,34 @@ pub fn stop(app: &AppHandle) {
         .clear();
 }
 
+/// 诊断页用：逐块网卡（名称 / IPv4 / 掩码 / 前缀 / 短 ID）。
+pub(crate) fn interface_details() -> Vec<serde_json::Value> {
+    let mut rows = Vec::new();
+    if let Ok(ifaces) = if_addrs::get_if_addrs() {
+        for iface in ifaces {
+            if iface.is_loopback() {
+                continue;
+            }
+            if let if_addrs::IfAddr::V4(v4) = iface.addr {
+                let prefix = v4.netmask.octets().iter().map(|b| b.count_ones()).sum::<u32>();
+                rows.push(json!({
+                    "name": iface.name,
+                    "ip": v4.ip.to_string(),
+                    "netmask": v4.netmask.to_string(),
+                    "prefix": prefix,
+                    "shortId": format!("{:03}", v4.ip.octets()[3]),
+                }));
+            }
+        }
+    }
+    rows.sort_by(|a, b| {
+        a.get("name")
+            .and_then(|v| v.as_str())
+            .cmp(&b.get("name").and_then(|v| v.as_str()))
+    });
+    rows
+}
+
 #[tauri::command]
 pub fn list_peers(app: AppHandle) -> Vec<PeerView> {
     peers_snapshot(&app)

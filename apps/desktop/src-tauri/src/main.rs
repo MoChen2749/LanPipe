@@ -234,6 +234,10 @@ fn main() {
     log(&format!("instance={instance:?} port_offset={offset}"));
 
     tauri::Builder::default()
+        // 单实例：第二次启动只把已有窗口叫到前台，不新开进程。
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }))
         .plugin(tauri_plugin_dialog::init())
         .manage(settings::SettingsState::default())
         .manage(net::NetState::default())
@@ -328,11 +332,55 @@ fn main() {
             reveal_path,
             backdrop_info,
             window_shadow,
+            diagnostics,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LanPipe");
 }
 
+
+/// 诊断页：一次性返回网卡、端口、发现状态、防火墙、材质、状态目录与附近设备。
+#[tauri::command]
+fn diagnostics(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    use serde_json::json;
+    use tauri::Manager;
+
+    let cfg = settings::snapshot(&app)?;
+    let local = net::local_info(app.clone())?;
+    let peers = net::list_peers(app.clone());
+    let backdrop = app
+        .state::<BackdropState>()
+        .0
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_default();
+    let state_dir = lanpipe_net::journal::default_state_dir();
+    let journal_dir = state_dir.join("journals");
+    let journal_count = std::fs::read_dir(&journal_dir)
+        .map(|dir| dir.flatten().count())
+        .unwrap_or(0);
+    let config_path = app
+        .state::<settings::SettingsState>()
+        .path_string();
+
+    Ok(json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "osBuild": windows_version::OsVersion::current().build,
+        "backdrop": backdrop,
+        "configPath": config_path,
+        "stateDir": state_dir.to_string_lossy(),
+        "journalCount": journal_count,
+        "listen": { "udp": local.get("udpPort"), "tcp": local.get("tcpPort") },
+        "discovery": cfg.network.discovery,
+        "streams": cfg.transfer.streams,
+        "downloadDir": cfg.download_dir,
+        "shortId": local.get("shortId"),
+        "deviceId": cfg.device_id,
+        "interfaces": net::interface_details(),
+        "peers": peers,
+        "firewall": firewall::status(),
+    }))
+}
 
 /// 托盘：左键显示主窗口，菜单可显示或退出。
 fn build_tray(app: &mut tauri::App) -> tauri::Result<()> {

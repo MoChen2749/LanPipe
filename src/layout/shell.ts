@@ -4,12 +4,13 @@ import { api } from "../api/tauri";
 import { toast } from "../actions";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-export type Route = "send" | "receive" | "history" | "settings";
+export type Route = "send" | "receive" | "history" | "diagnostics" | "settings";
 
 const NAV: { route: Route; icon: keyof typeof icons; label: string }[] = [
   { route: "send", icon: "send", label: "nav.send" },
   { route: "receive", icon: "receive", label: "nav.receive" },
   { route: "history", icon: "history", label: "nav.history" },
+  { route: "diagnostics", icon: "pulse", label: "nav.diagnostics" },
   { route: "settings", icon: "settings", label: "nav.settings" },
 ];
 

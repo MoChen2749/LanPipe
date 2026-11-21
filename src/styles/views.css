@@ -531,3 +531,59 @@
   background-clip: content-box;
   background-color: var(--border-strong);
 }
+
+/* 诊断页 */
+.diagnostics-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1120px;
+}
+
+.diagnostics-view .page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.diagnostics-card {
+  padding-bottom: 8px;
+}
+
+.diag-row {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 16px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.diag-row:first-of-type {
+  border-top: 0;
+}
+
+.diag-label {
+  color: var(--text-secondary);
+}
+
+.diag-value {
+  color: var(--text);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .diag-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
