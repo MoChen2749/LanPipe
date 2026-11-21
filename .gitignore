@@ -26,3 +26,8 @@ Thumbs.db
 # WebView2 涓存椂鏁版嵁
 /.wv2/
 *.pdb
+
+# 构建日志
+build-*.log
+target/installer-test/
+
