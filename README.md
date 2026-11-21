@@ -228,3 +228,9 @@ Windows 11 上如果界面「整窗发灰、只有自绘标题栏透」，先打
 - `WebView2 版本` 为 `145.x` 或 `154.x` 时，这是微软已知回归（[#5481](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5481)、[#5752](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5752)）：透明窗口会绘制不透明底板，`SetDefaultBackgroundColor(alpha=0)` 被忽略。
 - 程序会自动回退纯色（诊断页「窗口透明」显示「运行时缺陷，已回退纯色」），不再发灰；微软修复后自动恢复 Mica/Acrylic。
 - 调试可用 `LANPIPE_BACKDROP=mica|acrylic|none` 强制材质、`LANPIPE_TRANSPARENCY=force` 强制透明。
+
+### 材质分层约定
+
+- Win10（Acrylic）：页面 80%、Tab 90%、标题栏 90%+压深、卡片 92% —— 保持原方案。
+- Win11（Mica）：页面直接透出 Mica，Tab/标题栏/状态栏叠纯白 alpha，卡片用 `CardBackgroundFillColorDefault` + `CardStrokeDefault`（Fluent 官方取值）。不要把页面色按 alpha 叠到 Mica 上，会发灰。
+- 应用主题与系统主题不一致时自动退回纯色（材质按系统主题取色，无法跟随应用主题）。

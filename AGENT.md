@@ -638,3 +638,36 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 | 浮层 | 100% | 不透明，避免透出下层文字 |
 
 **排查建议**：遇到「材质没生效」先看诊断页的 `WebView2 版本` 与 `窗口透明`；再看 `窗口材质` 是 `mica` / `acrylic` / `none`。可用 `LANPIPE_BACKDROP=mica|acrylic|none` 强制材质、`LANPIPE_TRANSPARENCY=force` 强制透明做对照。
+
+### 16.7.9 材质分层：Win10 / Win11 分开（2026-11-21 官方取值）
+
+Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.css` 按 `data-backdrop` 分成两套：
+
+**Acrylic（Win10，build ≥ 17763）—— 保持已确认的方案**
+
+| 区域 | 取值 |
+|---|---|
+| 页面内容 | `--bg` @ 80% |
+| Tab / 导航 | `--surface` @ 90% |
+| 标题栏 | `--surface` @ 90% + 黑 10%（深色 14%） |
+| 状态栏 | `--surface` @ 90% |
+| 卡片 | `--surface` @ 92%（hover 96%） |
+
+**Mica（Win11，build ≥ 22000）—— 改为 Windows 11 设置页做法**
+
+| 区域 | 浅色 | 深色 |
+|---|---|---|
+| 页面 | 透明（Mica 直接透出） | 透明 |
+| Tab / 导航 | `#80FFFFFF`（LayerFillDefault） | `#0AFFFFFF`（4% 白） |
+| 标题栏 | 同 Tab + 黑 6% | 同 Tab + 黑 12% |
+| 状态栏 | 同 Tab | 同 Tab |
+| 卡片 | `#B2FFFFFF`（CardBackgroundFillColorDefault） | `#0DFFFFFF` |
+| 卡片描边 | `#0F000000`（CardStrokeDefault） | `#1A000000` |
+
+关键教训：**不要把 `--bg` 调 alpha 叠在 Mica 上**。Mica 已按壁纸取色，叠一层带色相的低透明度页面色会变成脏灰；官方做法是页面透明 + 纯白/纯黑 alpha 层（LayerFill / CardBackgroundFill / CardStroke）。
+
+**主题与系统不一致时**：DWM 材质按系统主题取色，无法按应用主题重新调色。`src/ui/theme.ts` 的 `syncMaterialBackdrop()` 在「应用主题 ≠ 系统主题」时移除 `data-backdrop`，退回纯色，避免「浅色材质 + 深色 UI」的脏灰；系统与应用一致时（默认）才启用材质。
+
+参考：
+- Color in Windows（分层：越不重要越深、越重要越亮）：<https://learn.microsoft.com/windows/apps/design/signature-experiences/color>
+- Fluent 颜色 token 与取值（LayerFillDefault `#80FFFFFF`/`#4D3A3A3A`、CardBackgroundFillDefault `#B2FFFFFF`/`#0DFFFFFF`、CardStrokeDefault `#0F000000`/`#1A000000`）：<https://learn.microsoft.com/visualstudio/extensibility/ux-guidelines/theme-color-token-reference>
