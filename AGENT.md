@@ -536,3 +536,14 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
   - 下拉浮层 portal 到 `document.body`，`position: fixed` + `z-index: 1300`，打开时按按钮 rect 定位，视口不足时向上翻转，监听 resize/scroll 重新定位；
   - 信息气泡 `z-index:1100`（标题栏 `z-index:40`）、Toast `z-index:1200`。
 - 降级：`LANPIPE_BACKDROP=mica|acrylic|none` 可强制材质；`window_shadow` 命令返回当前是否系统阴影。
+
+- 老系统圆角兜底（2026-11-21 补充）：
+  - Win11（build ≥ 22000）用 `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND` 系统圆角；
+  - Win10/Server（< 22000）DWM 不支持圆角，用 `CreateRoundRectRgn(0,0,w+1,h+1,16,16)` + `SetWindowRgn` 给窗口本身裁 8px 圆角（最大化时 `SetWindowRgn(hwnd, 0, 1)` 去掉），并在 `WindowEvent::Resized | ScaleFactorChanged` 时重算；
+  - `.app-root { border-radius:8px; overflow:hidden }` 作为内容层裁切，`body` 保持透明，圆角外就是桌面/材质，避免四角出现底色方块。
+- 标题栏按钮（2026-11-21 补充）：
+  - 悬停高亮用伪元素 `::before { inset:6px 5px; border-radius:4px }`（Win11 风格圆角内缩高亮），关闭按钮 `#C42B1C`；
+  - 图标统一 15px、`stroke-width:1.4`，且 `position:relative; z-index:1` 保证盖在悬停底色之上（否则绝对定位的 ::before 会盖住图标）。
+- 材质分层（2026-11-21 最终）：
+  - `body` 完全透明；`.app-root` 铺 28% 内容层；标题栏 42%、导航/状态栏 22%、卡片 72%、拖入区 40%、列表行 58%；
+  - 浮层 92%→不透明（`var(--surface)`）保证可读；无 `data-backdrop` 时全部回退纯色。

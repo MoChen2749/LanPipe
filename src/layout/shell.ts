@@ -88,7 +88,7 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
       "aria-label": t("window.maximize"),
       onclick: () => void win.toggleMaximize(),
     },
-    svgIcon(maxIcon(), 10),
+    svgIcon(maxIcon(), 12),
   );
   const winControls = el(
     "div",
@@ -102,7 +102,7 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
         "aria-label": t("window.minimize"),
         onclick: () => void win.minimize(),
       },
-      svgIcon(icons.minimize, 10),
+      svgIcon(icons.minimize, 12),
     ),
     maxBtn,
     el(
@@ -114,14 +114,14 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
         "aria-label": t("window.close"),
         onclick: () => void win.close(),
       },
-      svgIcon(icons.close, 10),
+      svgIcon(icons.close, 12),
     ),
   );
   const syncMaximized = async () => {
     try {
       const maximized = await win.isMaximized();
       document.documentElement.dataset.maximized = maximized ? "1" : "0";
-      maxBtn.replaceChildren(svgIcon(maxIcon(), 10));
+      maxBtn.replaceChildren(svgIcon(maxIcon(), 12));
       maxBtn.title = maximized ? t("window.restore") : t("window.maximize");
       maxBtn.setAttribute("aria-label", maxBtn.title);
     } catch {

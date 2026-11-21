@@ -13,7 +13,7 @@ body {
   font-size: 13px;
   line-height: 20px;
   color: var(--text);
-  background: var(--bg);
+  background: transparent;
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
@@ -58,6 +58,7 @@ textarea {
 /* 应用骨架 -------------------------------------------------------------- */
 
 .app-root {
+  background: var(--bg);
   display: grid;
   grid-template-rows: 48px 1fr 32px;
   grid-template-columns: 76px 1fr;
@@ -363,6 +364,7 @@ textarea {
 }
 
 .win-btn {
+  position: relative;
   width: 46px;
   height: 100%;
   display: inline-flex;
@@ -376,12 +378,34 @@ textarea {
     color var(--dur-fast) var(--ease-standard);
 }
 
-.win-btn:hover {
-  background: color-mix(in srgb, var(--text) 6%, transparent);
+.win-btn::before {
+  content: "";
+  position: absolute;
+  inset: 6px 5px;
+  border-radius: 4px;
+  background: transparent;
+  transition: background var(--dur-fast) var(--ease-standard);
 }
 
-.win-btn:active {
-  background: color-mix(in srgb, var(--text) 10%, transparent);
+.win-btn:hover::before {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.win-btn:active::before {
+  background: color-mix(in srgb, var(--text) 13%, transparent);
+}
+
+.win-btn svg {
+  position: relative;
+  z-index: 1;
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.4;
+}
+
+.win-btn.close:hover,
+.win-btn.close:active {
+  color: #ffffff;
 }
 
 .win-btn:focus-visible {
@@ -389,14 +413,12 @@ textarea {
   outline-offset: -2px;
 }
 
-.win-btn.close:hover {
+.win-btn.close:hover::before {
   background: #c42b1c;
-  color: #ffffff;
 }
 
-.win-btn.close:active {
+.win-btn.close:active::before {
   background: #b02a1e;
-  color: #ffffff;
 }
 
 @media (max-width: 640px) {

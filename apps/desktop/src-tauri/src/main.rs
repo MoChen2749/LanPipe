@@ -283,6 +283,16 @@ fn main() {
             match window {
                 Ok(window) => {
                     tune_window_frame(&window);
+                    // 老系统（无 DWM 圆角）在尺寸变化后重算窗口圆角区域
+                    let region_window = window.clone();
+                    window.on_window_event(move |event| {
+                        if matches!(
+                            event,
+                            tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+                        ) {
+                            apply_round_region(&region_window);
+                        }
+                    });
                     let backdrop = apply_backdrop(&window);
                     log(&format!(
                         "setup: window built, url={:?}, visible={:?}, backdrop={backdrop}",
@@ -412,6 +422,30 @@ struct DwmMargins {
 extern "system" {
     fn DwmExtendFrameIntoClientArea(hwnd: isize, margins: *const DwmMargins) -> i32;
 
+    fn DwmGetWindowAttribute(
+        hwnd: isize,
+        attr: u32,
+        value: *mut core::ffi::c_void,
+        size: u32,
+    ) -> i32;
+}
+
+#[link(name = "gdi32")]
+extern "system" {
+    fn CreateRoundRectRgn(
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+        width_ellipse: i32,
+        height_ellipse: i32,
+    ) -> isize;
+}
+
+#[link(name = "user32")]
+extern "system" {
+    fn SetWindowRgn(hwnd: isize, rgn: isize, redraw: i32) -> i32;
+
     fn DwmSetWindowAttribute(
         hwnd: isize,
         attr: u32,
@@ -453,6 +487,33 @@ fn tune_window_frame(window: &tauri::WebviewWindow) {
             &round as *const u32 as *const core::ffi::c_void,
             std::mem::size_of::<u32>() as u32,
         );
+    }
+    apply_round_region(window);
+}
+
+/// Win10/Server（<22000）没有 DWM 圆角，用窗口区域自己裁圆角，保证三端视觉一致。
+fn apply_round_region(window: &tauri::WebviewWindow) {
+    if windows_version::OsVersion::current().build >= 22000 {
+        return;
+    }
+    let Ok(hwnd) = window.hwnd() else { return };
+    let hwnd = hwnd.0 as isize;
+    let maximized = window.is_maximized().unwrap_or(false);
+    if maximized {
+        // 最大化时去掉区域，避免边缘漏出
+        unsafe {
+            let _ = SetWindowRgn(hwnd, 0, 1);
+        }
+        return;
+    }
+    let Ok(size) = window.inner_size() else { return };
+    let (w, h) = (size.width as i32, size.height as i32);
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    unsafe {
+        let rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, 16, 16);
+        let _ = SetWindowRgn(hwnd, rgn, 1);
     }
 }
 

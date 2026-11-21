@@ -112,6 +112,24 @@ if (flag === "--tall") {
 await send(ws, "Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1, button: "none" });
 await sleep(150);
 
+// SHOT_HOVER=<selector>：把鼠标移到元素中心，用于截 hover 态。
+if (process.env.SHOT_HOVER) {
+  const expr = `(() => {
+    const node = document.querySelector(${JSON.stringify(process.env.SHOT_HOVER)});
+    if (!node) return null;
+    const r = node.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  })()`;
+  const r = await send(ws, "Runtime.evaluate", { expression: expr, returnByValue: true });
+  const pos = r.result?.value;
+  if (pos) {
+    await send(ws, "Input.dispatchMouseEvent", { type: "mouseMoved", x: pos.x, y: pos.y, button: "none" });
+    await sleep(260);
+  } else {
+    console.log("hover: missing", process.env.SHOT_HOVER);
+  }
+}
+
 const shot = await send(ws, "Page.captureScreenshot", {
   format: "png",
   captureBeyondViewport: false,

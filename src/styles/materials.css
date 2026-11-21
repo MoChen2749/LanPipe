@@ -13,13 +13,14 @@
 
 :root[data-backdrop="mica"] body,
 :root[data-backdrop="acrylic"] body {
-  /* 内容层（WinUI LayerFillColorDefaultBrush 语义）：约 58% 透出材质 */
-  background: color-mix(in srgb, var(--bg) 42%, transparent);
+  background: transparent;
 }
 
 :root[data-backdrop="mica"] .app-root,
 :root[data-backdrop="acrylic"] .app-root {
-  background: transparent;
+  /* 内容层（WinUI LayerFillColorDefaultBrush 语义）：保留少量底色保证可读，
+     其余透出窗口材质；正文/标题在 28% 覆层上对比度足够（浅色主题） */
+  background: color-mix(in srgb, var(--bg) 28%, transparent);
 }
 
 :root[data-backdrop="mica"] .titlebar,
