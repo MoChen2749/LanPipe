@@ -1,13 +1,17 @@
 /* 窗口材质（Mica / Acrylic）与半透明层 --------------------------------
- * 参考 Windows 11 应用分层：
- * - 窗口底层：Mica（桌面壁纸取色，静态模糊）/ Acrylic（实时模糊）
- * - 内容层：半透明底色压在材质上，保证任意壁纸与主题下文字可读
- * - 标题栏/导航/状态栏：更透一些，让材质透出
- * - 卡片/列表：半透明填充（不加 backdrop-filter，避免创建层叠上下文）
- * - 浮层（下拉/气泡/Toast）：更亮的亚克力
+ * 参考 Windows 11 应用分层（Settings / Explorer 的实际做法）：
+ * - 窗口底层：Mica（壁纸取色 + 模糊）/ Acrylic（实时模糊）
+ * - 标题栏 / 左导航 / 状态栏：半透明，让材质明显透出（这是"Windows 味"的来源）
+ * - 内容区：接近不透明的页面底色，保证任意壁纸下文字都清晰
+ * - 卡片 / 列表：高不透明度填充（不加 backdrop-filter，避免创建层叠上下文）
+ * - 浮层（下拉 / 气泡 / Toast）：完全不透明，避免透出下层文字
+ *
+ * 教训（2026-11-21，Win11 用户实测）：
+ * - 内容层透明度不能给太低（曾用 28%），否则深色壁纸下的 Mica 会透成一张灰纸，
+ *   整体发灰、文字对比度差；Mica 应该主要出现在标题栏/导航/状态栏。
  *
  * 重要：卡片不要加 backdrop-filter —— 它会创建层叠上下文，
- * 让卡片内部的下拉浮层被后面的兄弟卡片盖住（2026-11-21 用户反馈的层级 bug）。
+ * 让卡片内部的下拉浮层被后面的兄弟卡片盖住。
  * 仅在 data-backdrop="mica|acrylic" 时启用；不支持材质的环境保持纯色。
  */
 
@@ -16,64 +20,66 @@
   background: transparent;
 }
 
+/* 应用根节点保持透明，让材质在标题栏/导航/状态栏直接透出；
+   内容区自己铺接近不透明的页面底色。 */
 :root[data-backdrop="mica"] .app-root,
 :root[data-backdrop="acrylic"] .app-root {
-  /* 内容层（WinUI LayerFillColorDefaultBrush 语义）：保留少量底色保证可读，
-     其余透出窗口材质；正文/标题在 28% 覆层上对比度足够（浅色主题） */
-  background: color-mix(in srgb, var(--bg) 28%, transparent);
+  background: transparent;
 }
 
 :root[data-backdrop="mica"] .titlebar,
 :root[data-backdrop="acrylic"] .titlebar {
-  background: color-mix(in srgb, var(--surface) 42%, transparent);
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
   backdrop-filter: saturate(1.6) blur(30px);
-  border-bottom-color: color-mix(in srgb, var(--border) 60%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
   box-shadow: none;
 }
 
 :root[data-backdrop="mica"] .nav,
 :root[data-backdrop="acrylic"] .nav {
-  background: color-mix(in srgb, var(--surface) 22%, transparent);
-  border-right-color: color-mix(in srgb, var(--border) 55%, transparent);
+  background: color-mix(in srgb, var(--surface) 42%, transparent);
+  border-right-color: color-mix(in srgb, var(--border) 50%, transparent);
   backdrop-filter: saturate(1.4) blur(30px);
 }
 
 :root[data-backdrop="mica"] .content,
 :root[data-backdrop="acrylic"] .content {
-  background: transparent;
+  /* 页面内容层：接近不透明（WinUI 里页面底色基本是不透明的），
+     只留一点材质呼吸感，保证任何壁纸/主题下都像"浅色应用"而不是灰纸 */
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
 }
 
 :root[data-backdrop="mica"] .statusbar,
 :root[data-backdrop="acrylic"] .statusbar {
-  background: color-mix(in srgb, var(--surface) 22%, transparent);
-  border-top-color: color-mix(in srgb, var(--border) 55%, transparent);
+  background: color-mix(in srgb, var(--surface) 42%, transparent);
+  border-top-color: color-mix(in srgb, var(--border) 50%, transparent);
   backdrop-filter: saturate(1.4) blur(30px);
 }
 
-/* 卡片：半透明填充，不加 backdrop-filter（见文件头说明） */
+/* 卡片：高不透明度，文字优先；不加 backdrop-filter（见文件头） */
 :root[data-backdrop="mica"] .card,
 :root[data-backdrop="acrylic"] .card {
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
 
 :root[data-backdrop="mica"] .card:hover,
 :root[data-backdrop="acrylic"] .card:hover {
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
 }
 
 :root[data-backdrop="mica"] .dropzone,
 :root[data-backdrop="acrylic"] .dropzone {
-  background: color-mix(in srgb, var(--surface) 40%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
 }
 
 :root[data-backdrop="mica"] .list-row,
 :root[data-backdrop="acrylic"] .list-row,
 :root[data-backdrop="mica"] .device,
 :root[data-backdrop="acrylic"] .device {
-  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
 }
 
-/* 浮层用更亮的 Acrylic，保证可读，且不叠在别的材质上 */
+/* 浮层完全不透明，保证可读，且不叠在别的材质上 */
 :root[data-backdrop="mica"] .dd-pop,
 :root[data-backdrop="acrylic"] .dd-pop,
 :root[data-backdrop="mica"] .info-pop,
@@ -88,8 +94,13 @@
 @media (max-width: 640px) {
   :root[data-backdrop="mica"] .nav,
   :root[data-backdrop="acrylic"] .nav {
-    background: color-mix(in srgb, var(--surface) 60%, transparent);
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
     backdrop-filter: saturate(1.8) blur(40px);
+  }
+
+  :root[data-backdrop="mica"] .content,
+  :root[data-backdrop="acrylic"] .content {
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
   }
 
   :root[data-backdrop="mica"] .dropzone,

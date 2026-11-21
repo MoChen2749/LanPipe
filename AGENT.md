@@ -484,12 +484,12 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 | 层 | 材质 | 实现 |
 | --- | --- | --- |
 | 窗口底 | Mica（Windows 11 build ≥ 22000）/ Acrylic（Win10 1809+ build ≥ 17763）/ 纯色 | Tauri `unstable` + `transparent(true)` + `Window::set_effects(EffectsBuilder)`；`LANPIPE_BACKDROP=mica|acrylic|none` 可强制覆盖 |
-| 标题栏 | 45% surface + `blur(30px)` | `.titlebar` |
-| 左侧导航 / 状态栏 | 30% surface + `blur(30px)` | `.nav` / `.statusbar` |
-| 内容卡片 | 84% surface + `blur(24px)`（悬停 90%） | `.card` |
-| 拖入框 | 58% surface + `blur(18px)` | `.dropzone` |
-| 列表行 / 设备卡 | 72% surface + `blur(14px)` | `.list-row` / `.device` |
-| 浮层（下拉、信息气泡、Toast） | 82% surface + `blur(40px)` | `.dd-pop` / `.info-pop` / `.toast` |
+| 标题栏 | 52% surface + `blur(30px)` | `.titlebar` |
+| 左侧导航 / 状态栏 | 42% surface + `blur(30px)` | `.nav` / `.statusbar` |
+| 内容卡片 | 92% surface（悬停 96%，无 `backdrop-filter`） | `.card` |
+| 拖入框 | 70% surface | `.dropzone` |
+| 列表行 / 设备卡 | 80% surface | `.list-row` / `.device` |
+| 浮层（下拉、信息气泡、Toast） | 100% surface（不透明，不用 `backdrop-filter`） | `.dd-pop` / `.info-pop` / `.toast` |
 
 - 启动时由 `backdrop_info` 命令返回实际生效材质（mica / acrylic / none），前端写 `document.documentElement.dataset.backdrop`；不支持材质时不加属性，保持不透明 `--bg`，**绝不出现透明露底**。
 - 降级条件（微软文档）：透明效果关闭、节电模式、低端设备、窗口失焦、系统版本不足时，材质退化为纯色——前端不感知，靠不透明兜底。
