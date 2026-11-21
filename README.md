@@ -249,3 +249,12 @@ Windows 11 上如果界面「整窗发灰、只有自绘标题栏透」，先打
 - `npx tauri build` 需要 `cargo` 在 PATH 上（本机为 `%USERPROFILE%\.cargo\bin`）。
 - 首次打包会下载 WiX/NSIS 工具到 `%LOCALAPPDATA%\tauri`；若 GitHub 直连超时，可先用代理下载 `wix314-binaries.zip` / `nsis-3.13.zip` 解压到该目录。
 - NSIS（per-user）目标已配置但当前暂不作为交付：本机静默安装（`/S`）返回 0 却不落盘，待查；MSI 已验证安装/卸载/运行正常。
+
+### 自动更新（M3，骨架）
+
+- 插件：`tauri-plugin-updater`（Rust）+ 前端「设置 → 关于 → 检查更新」。
+- 配置在 `apps/desktop/src-tauri/tauri.conf.json` 的 `plugins.updater`：`pubkey`、`endpoints`、`windows.installMode = "passive"`（安装时只显示进度条）。
+- 当前 `endpoints` 占位为 `https://example.invalid/lanpipe/latest.json`，所以点「检查更新」会走到失败分支并提示；换成真实地址后即可工作。
+- 开发密钥：`.keys/lanpipe-updater.key`（口令 `lanpipe-dev-key`）与 `.keys/lanpipe-updater.key.pub`；**正式发布必须换新密钥，且私钥只放 CI secret**（`TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`）。
+- 发布清单：`pwsh tools/publish-release.ps1 -Installer <msi> -Version 0.1.1 -Url <下载地址> -Notes "..."` 会调用 `tauri signer sign` 生成 `.sig`，并写出 `latest.json`（`version/notes/pub_date/platforms.windows-x86_64.{signature,url}`）。
+- 端到端顺序：改版本号（`tauri.conf.json` 与 workspace `Cargo.toml`）→ `npm run build` → `tauri build --bundles msi` → `publish-release.ps1` → 上传 MSI + `latest.json` 到 `endpoints` 指向的目录。

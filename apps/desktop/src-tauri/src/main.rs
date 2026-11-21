@@ -241,6 +241,7 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(settings::SettingsState::default())
         .manage(net::NetState::default())
@@ -340,6 +341,7 @@ fn main() {
             backdrop_info,
             backdrop_apply,
             window_shadow,
+            check_update,
             diagnostics,
         ])
         .run(tauri::generate_context!())
@@ -748,6 +750,29 @@ fn firewall_allow(app: tauri::AppHandle) -> Result<bool, String> {
 #[tauri::command]
 fn firewall_elevated() -> bool {
     firewall::is_elevated()
+}
+
+/// 检查更新：Ok(None) 表示已是最新；Err 表示网络或配置问题。
+#[derive(serde::Serialize)]
+pub struct UpdateInfo {
+    pub version: String,
+    pub notes: Option<String>,
+    pub date: Option<String>,
+}
+
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|err| err.to_string())?;
+    match updater.check().await {
+        Ok(Some(update)) => Ok(Some(UpdateInfo {
+            version: update.version.clone(),
+            notes: update.body.clone(),
+            date: update.date.map(|value| value.to_string()),
+        })),
+        Ok(None) => Ok(None),
+        Err(err) => Err(err.to_string()),
+    }
 }
 
 /// 当前环境是否使用系统窗口阴影（Win11 为 true）。

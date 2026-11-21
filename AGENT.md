@@ -681,3 +681,16 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 - **便携版**：`tools/make-portable.ps1`（UTF-8 **带 BOM**，否则 Windows PowerShell 5.1 会因中文把字符串解析坏）→ `target/release/bundle/portable/LanPipe_0.1.0_x64-portable.zip`（exe + LICENSE + 使用说明）。
 - **NSIS（per-user）**：配置保留（`installMode=currentUser`、简中/英文、installerIcon、startMenuFolder），但本机 `setup.exe /S` 返回 0 且不落盘（临时目录改为可写目录后才不报 NSIS Error），暂不作为交付；待查 Tauri NSIS 静默模式的 abort 原因。
 - 打包注意：先 `npm run build` 再 `npx tauri build`；`cargo` 需在 PATH；首次打包下载 WiX/NSIS 到 `%LOCALAPPDATA%\tauri`。
+
+### 16.12 自动更新（M3 骨架，2026-11-22）
+
+- 依赖：`tauri-plugin-updater = "2"`；`main.rs` 注册 `.plugin(tauri_plugin_updater::Builder::new().build())`（放在单实例插件之后）。
+- 配置：`tauri.conf.json` → `plugins.updater = { pubkey, endpoints: [...], windows: { installMode: "passive" } }`；`pubkey` 是 `.keys/lanpipe-updater.key.pub` 的 base64 内容。
+- 命令：`#[tauri::command] async fn check_update(app) -> Result<Option<UpdateInfo>, String>`，内部 `app.updater()?.check().await`；`Ok(None)`=已是最新，`Err`=网络/配置问题；`UpdateInfo{version, notes, date}`。
+- 前端：`api.checkUpdate()` → 设置页「关于」卡里的「检查更新」按钮 + 状态文本（`当前版本/正在检查/发现新版本/已是最新版本/检查失败，请稍后重试`）+ 失败 toast。
+- 密钥与签名：
+  - 开发密钥 `.keys/lanpipe-updater.key`（口令 `lanpipe-dev-key`），`.gitignore` 已忽略 `.keys/`；
+  - 正式发布换新密钥，CI 里用 `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`；
+  - `tools/publish-release.ps1` 调 `tauri signer sign` 生成 `.sig` 并写 `latest.json`。
+- 端到端：改版本（`tauri.conf.json` + workspace `Cargo.toml`）→ `npm run build` → `npx tauri build --bundles msi` → `tools/publish-release.ps1 -Installer ... -Version ... -Url ...` → 上传 MSI 与 `latest.json`。
+- 当前状态：`endpoints` 还是 `https://example.invalid/lanpipe/latest.json` 占位，点「检查更新」会走失败分支（提示 + toast），端点换成真实地址即可用。

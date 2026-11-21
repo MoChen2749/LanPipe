@@ -17,6 +17,7 @@ tauri = { version = "2", features = ["unstable", "tray-icon", "image-png"] }
 windows-version = "0.1"
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
 lanpipe-proto = { path = "../../../crates/lanpipe-proto" }
 lanpipe-net = { path = "../../../crates/lanpipe-net" }
 tokio = { version = "1", features = ["sync", "rt-multi-thread"] }

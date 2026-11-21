@@ -86,6 +86,8 @@ export const api = {
   backdropInfo: () => invoke<string>("backdrop_info"),
   backdropApply: (mode: string) => invoke<string>("backdrop_apply", { mode }),
   windowShadow: () => invoke<boolean>("window_shadow"),
+  checkUpdate: () =>
+    invoke<{ version: string; notes?: string | null; date?: string | null } | null>("check_update"),
   diagnostics: () => invoke<any>("diagnostics"),
   firewallStatus: () => invoke<boolean>("firewall_status"),
   autostartEnabled: () => invoke<boolean>("autostart_enabled"),

@@ -49,6 +49,8 @@ export function mountSettings(container: HTMLElement): () => void {
       version = value;
       const node = document.getElementById("about-version");
       if (node) node.textContent = t("settings.about.version", { version: value });
+      const upd = document.getElementById("update-state");
+      if (upd && !upd.textContent) upd.textContent = t("settings.updateIdle", { version: value });
     })
     .catch(() => undefined);
   return () => undefined;
@@ -343,6 +345,30 @@ function build(): HTMLElement {
       el("div", { text: t("settings.about.docs") }),
     ),
   );
+
+  const updateBtn = el("button", {
+    class: "btn small",
+    id: "update-btn",
+    text: t("settings.checkUpdate"),
+  });
+  const updateState = el("span", { class: "muted", id: "update-state" });
+  updateBtn.addEventListener("click", async () => {
+    updateBtn.setAttribute("disabled", "true");
+    updateState.textContent = t("settings.updateChecking");
+    try {
+      const result = await api.checkUpdate();
+      updateState.textContent = result
+        ? t("settings.updateFound", { version: result.version })
+        : t("settings.updateLatest");
+    } catch (err) {
+      updateState.textContent = t("settings.updateFailed");
+      void err;
+      toast(t("toast.updateFailed"));
+    } finally {
+      updateBtn.removeAttribute("disabled");
+    }
+  });
+  aboutCard.appendChild(el("div", { class: "row", style: "margin-top:12px" }, updateBtn, updateState));
 
   return el(
     "div",
