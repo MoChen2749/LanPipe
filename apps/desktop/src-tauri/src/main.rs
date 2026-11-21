@@ -408,6 +408,23 @@ struct DwmMargins {
     cy_bottom_height: i32,
 }
 
+#[link(name = "user32")]
+extern "system" {
+    fn GetWindowLongPtrW(hwnd: isize, index: i32) -> isize;
+
+    fn SetWindowLongPtrW(hwnd: isize, index: i32, value: isize) -> isize;
+
+    fn SetWindowPos(
+        hwnd: isize,
+        insert_after: isize,
+        x: i32,
+        y: i32,
+        cx: i32,
+        cy: i32,
+        flags: u32,
+    ) -> i32;
+}
+
 #[link(name = "dwmapi")]
 extern "system" {
     fn DwmExtendFrameIntoClientArea(hwnd: isize, margins: *const DwmMargins) -> i32;
@@ -453,6 +470,34 @@ fn tune_window_frame(window: &tauri::WebviewWindow) {
             &round as *const u32 as *const core::ffi::c_void,
             std::mem::size_of::<u32>() as u32,
         );
+    }
+
+    // Win11：DWM 只对"带标准 resize frame"的窗口做圆角与投影。
+    // 自绘标题栏窗口默认是 WS_POPUP，需补回 WS_THICKFRAME（不补 WS_CAPTION），
+    // 否则圆角/阴影都不生效，且会出现无过渡的灰边。
+    if windows_version::OsVersion::current().build >= 22000 {
+        const GWL_STYLE: i32 = -16;
+        const WS_THICKFRAME: isize = 0x0004_0000;
+        const SWP_NOSIZE: u32 = 0x0001;
+        const SWP_NOMOVE: u32 = 0x0002;
+        const SWP_NOZORDER: u32 = 0x0004;
+        const SWP_NOACTIVATE: u32 = 0x0010;
+        const SWP_FRAMECHANGED: u32 = 0x0020;
+        unsafe {
+            let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+            if style != 0 && (style & WS_THICKFRAME) == 0 {
+                let _ = SetWindowLongPtrW(hwnd, GWL_STYLE, style | WS_THICKFRAME);
+                let _ = SetWindowPos(
+                    hwnd,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+                );
+            }
+        }
     }
 }
 
