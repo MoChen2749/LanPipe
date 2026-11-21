@@ -202,7 +202,7 @@ cd /mnt/f/Projects/lanpipe && cargo build --release -p lanpipe-cli
 - `src/i18n/`：XML 语言包加载器（`public/i18n/zh-CN.xml`，`t(key, vars)`）。
 - `src/api/tauri.ts`：后端命令/事件封装；`src/state/store.ts`：单一状态与事件折叠。
 - `src/layout/shell.ts`：标题栏 + 左导航 + 状态栏（<640px 底部 Tab）。
-- `src/views/`：`send` / `receive` / `history` / `settings` 四页；`src/actions.ts` 业务动作。
+- `src/views/`：`send` / `receive` / `history` / `diagnostics` / `settings` 五页；`src/actions.ts` 业务动作。
 
 构建：`npm run build`（前端 → `dist/`）后再 `cargo build --release --features custom-protocol -p lanpipe`。
 
@@ -214,3 +214,9 @@ node tools/ui-shot.mjs 9333 docs/shot.png 3 --tall
 ```
 
 截图由 WebView2 DevTools 协议直接取页面渲染，不依赖屏幕/前台窗口。
+
+## 诊断与单实例（M1）
+
+- 左导航「诊断」：概览（版本/Build/材质/短 ID/完整 ID/配置与状态目录）、网络（逐块网卡/掩码/短 ID、监听端口、发现、并发流、防火墙、接收目录）、附近设备。
+- 「刷新」重新采集；「复制诊断信息」把整份 JSON 放进剪贴板。
+- 单实例：第二次启动只聚焦已有窗口，不会新开进程；关闭窗口收进托盘。
