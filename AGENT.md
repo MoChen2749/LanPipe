@@ -484,9 +484,9 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 | 层 | 材质 | 实现 |
 | --- | --- | --- |
 | 窗口底 | Mica（Windows 11 build ≥ 22000）/ Acrylic（Win10 1809+ build ≥ 17763）/ 纯色 | Tauri `unstable` + `transparent(true)` + `Window::set_effects(EffectsBuilder)`；`LANPIPE_BACKDROP=mica|acrylic|none` 可强制覆盖 |
-| 内容页面 | `var(--bg)` 完全不透明（内容区不做透明；材质只在框上） | `.content` |
+| 内容页面 | 80% `--bg`（浅色/深色一致） | `.content` |
 | 标题栏 | 74% surface + `blur(30px)` | `.titlebar` |
-| 左侧导航 / 状态栏 | 66% surface + `blur(30px)` | `.nav` / `.statusbar` |
+| 左侧导航 | 浅色 90% / 深色 66% surface + `blur(30px)`；状态栏 66% | `.nav` / `.statusbar` |
 | 内容卡片 | 92% surface（悬停 96%，无 `backdrop-filter`） | `.card` |
 | 拖入框 | 70% surface | `.dropzone` |
 | 列表行 / 设备卡 | 80% surface | `.list-row` / `.device` |
