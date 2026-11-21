@@ -520,3 +520,19 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 3. 页面动画只在切页触发；6s 轮询不重播；`prefers-reduced-motion` 下静止。
 4. 375×812 无横向滚动，触控目标 ≥ 44。
 5. 深色/浅色下卡片、浮层文字均可读。
+
+### 16.7.7 无边框窗口与浮层层级（2026-11-21）
+
+- 窗口 `decorations(false)` + `transparent(true)`，系统标题栏去掉，标题栏/窗口按钮由前端自绘：
+  - 拖动：`data-tauri-drag-region`（标题栏空白、品牌区、spacer），需权限 `core:window:allow-start-dragging`；
+  - 双击标题栏空白 = 最大化/还原；窗口按钮 = 最小化 / 最大化还原 / 关闭（`core:window:allow-minimize|allow-toggle-maximize|allow-close|allow-is-maximized`）；
+  - 关闭按钮 hover 用 `#C42B1C`（Windows 标准危险色）。
+- 外框：
+  - `DwmExtendFrameIntoClientArea(hwnd, {1,1,1,1})` 让 DWM 为无边框窗口绘制柔和阴影；
+  - `DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE(0xFFFFFFFE)` 去掉生硬的 1px 边框线；
+  - `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND(2)`（Win11 圆角），CSS `.app-root { border-radius:8px; overflow:hidden }` 兜底，最大化时归零。
+- 层级规则（重要）：
+  - **卡片/列表不要加 `backdrop-filter`/`transform`**：会创建层叠上下文，把内部浮层闷在卡片里；
+  - 下拉浮层 portal 到 `document.body`，`position: fixed` + `z-index: 1300`，打开时按按钮 rect 定位，视口不足时向上翻转，监听 resize/scroll 重新定位；
+  - 信息气泡 `z-index:1100`（标题栏 `z-index:40`）、Toast `z-index:1200`。
+- 降级：`LANPIPE_BACKDROP=mica|acrylic|none` 可强制材质；`window_shadow` 命令返回当前是否系统阴影。

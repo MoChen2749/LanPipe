@@ -2,6 +2,7 @@ import { clear, el, icons, svgIcon } from "../ui/dom";
 import { t } from "../i18n";
 import { api } from "../api/tauri";
 import { toast } from "../actions";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 export type Route = "send" | "receive" | "history" | "settings";
 
@@ -75,6 +76,61 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
     }
   });
 
+  // 自绘窗口按钮（窗口用 decorations(false)，系统标题栏已去掉）
+  const win = getCurrentWindow();
+  const maxIcon = () => (document.documentElement.dataset.maximized === "1" ? icons.restore : icons.maximize);
+  const maxBtn = el(
+    "button",
+    {
+      class: "win-btn",
+      type: "button",
+      title: t("window.maximize"),
+      "aria-label": t("window.maximize"),
+      onclick: () => void win.toggleMaximize(),
+    },
+    svgIcon(maxIcon(), 10),
+  );
+  const winControls = el(
+    "div",
+    { class: "win-controls" },
+    el(
+      "button",
+      {
+        class: "win-btn",
+        type: "button",
+        title: t("window.minimize"),
+        "aria-label": t("window.minimize"),
+        onclick: () => void win.minimize(),
+      },
+      svgIcon(icons.minimize, 10),
+    ),
+    maxBtn,
+    el(
+      "button",
+      {
+        class: "win-btn close",
+        type: "button",
+        title: t("window.close"),
+        "aria-label": t("window.close"),
+        onclick: () => void win.close(),
+      },
+      svgIcon(icons.close, 10),
+    ),
+  );
+  const syncMaximized = async () => {
+    try {
+      const maximized = await win.isMaximized();
+      document.documentElement.dataset.maximized = maximized ? "1" : "0";
+      maxBtn.replaceChildren(svgIcon(maxIcon(), 10));
+      maxBtn.title = maximized ? t("window.restore") : t("window.maximize");
+      maxBtn.setAttribute("aria-label", maxBtn.title);
+    } catch {
+      /* 忽略：非 Tauri 环境 */
+    }
+  };
+  void syncMaximized();
+  window.addEventListener("resize", () => void syncMaximized());
+
   const titlebar = el(
     "header",
     { class: "titlebar", "data-tauri-drag-region": "" },
@@ -93,7 +149,14 @@ export function buildShell(root: HTMLElement, onNavigate: (route: Route) => void
     identity,
     infoBtn,
     infoPop,
+    winControls,
   );
+
+  // 双击标题栏空白处 = 最大化/还原
+  titlebar.addEventListener("dblclick", (event) => {
+    if ((event.target as HTMLElement).closest(".win-controls")) return;
+    void win.toggleMaximize();
+  });
 
   const nav = el("nav", { class: "nav", "aria-label": "primary" });
   let indicatorReady = false;

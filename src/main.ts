@@ -29,6 +29,14 @@ async function main(): Promise<void> {
   events.transfer((event) => applyTransferEvent(event));
 
   await loadBootstrap();
+  void api
+    .windowShadow()
+    .then((on) => {
+      document.documentElement.dataset.shadow = on ? "1" : "0";
+    })
+    .catch(() => {
+      document.documentElement.dataset.shadow = "0";
+    });
   watchTheme();
   applyBackdrop();
   navigate("send");

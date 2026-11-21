@@ -192,11 +192,11 @@
 }
 
 .dd-pop {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  /* 挂在 body 上（portal），fixed 定位 + 高层级，避免被卡片动画的层叠上下文盖住 */
+  position: fixed;
+  z-index: 1300;
+  max-height: 60vh;
+  overflow-y: auto;
   padding: var(--space-1);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -676,7 +676,7 @@
   position: fixed;
   left: 50%;
   bottom: 48px;
-  z-index: 50;
+  z-index: 1200;
   transform: translateX(-50%);
   padding: 10px 16px;
   border-radius: var(--radius-overlay);

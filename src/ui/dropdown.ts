@@ -13,7 +13,12 @@ export interface DropdownOptions {
   onChange?: (value: string) => void;
 }
 
-/** WinUI 3 风格下拉：自绘弹出层（原生 select 无法定制选项样式）。 */
+/**
+ * WinUI 3 风格下拉：自绘弹出层（原生 select 无法定制选项样式）。
+ *
+ * 弹出层挂在 document.body 并用 fixed 定位，
+ * 避免卡片入场动画的 transform 造成层叠上下文、把浮层闷在卡片里。
+ */
 export function dropdown(opts: DropdownOptions): HTMLElement {
   let value = opts.value;
   let open = false;
@@ -62,6 +67,26 @@ export function dropdown(opts: DropdownOptions): HTMLElement {
     pop.append(row);
   }
 
+  const place = () => {
+    const rect = button.getBoundingClientRect();
+    const gap = 4;
+    pop.style.width = `${rect.width}px`;
+    pop.style.left = `${Math.round(rect.left)}px`;
+    // 先放到按钮下方，空间不够时翻到上方
+    pop.style.top = "0px";
+    const height = pop.offsetHeight;
+    const below = window.innerHeight - rect.bottom;
+    const top =
+      below < height + gap && rect.top > below ? rect.top - height - gap : rect.bottom + gap;
+    pop.style.top = `${Math.round(top)}px`;
+  };
+
+  const onViewportChange = () => {
+    if (open) place();
+  };
+  window.addEventListener("resize", onViewportChange);
+  window.addEventListener("scroll", onViewportChange, true);
+
   function close(returnFocus = false) {
     if (!open) return;
     open = false;
@@ -75,6 +100,7 @@ export function dropdown(opts: DropdownOptions): HTMLElement {
     open = true;
     pop.classList.remove("hidden");
     button.setAttribute("aria-expanded", "true");
+    place();
     optionButtons[activeIndex]?.focus();
   }
 
@@ -123,10 +149,12 @@ export function dropdown(opts: DropdownOptions): HTMLElement {
   document.addEventListener("click", (event) => {
     const target = event.target as Node | null;
     if (!target) return;
-    if (!root.contains(target)) close(false);
+    if (!root.contains(target) && !pop.contains(target)) close(false);
   });
 
-  const root = el("div", { class: "dd" }, button, pop);
+  document.body.append(pop);
+
+  const root = el("div", { class: "dd" }, button);
   syncLabel();
   return root;
 }

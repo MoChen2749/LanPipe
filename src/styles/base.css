@@ -70,6 +70,8 @@ textarea {
 
 .titlebar {
   grid-area: titlebar;
+  position: relative;
+  z-index: 40;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -205,6 +207,8 @@ textarea {
 
 .statusbar {
   grid-area: status;
+  position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -299,7 +303,7 @@ textarea {
   position: fixed;
   top: 44px;
   right: 16px;
-  z-index: 40;
+  z-index: 1100;
   width: 240px;
   padding: var(--space-2);
   background: var(--surface);
@@ -347,4 +351,66 @@ textarea {
 .info-hint {
   padding: 6px 6px 2px;
   font-size: 11px;
+}
+
+/* 自绘窗口按钮（WinUI 3 caption buttons） ------------------------------- */
+
+.win-controls {
+  display: flex;
+  align-self: stretch;
+  margin-left: var(--space-2);
+  margin-right: calc(var(--space-4) * -1);
+}
+
+.win-btn {
+  width: 46px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.win-btn:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.win-btn:active {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.win-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.win-btn.close:hover {
+  background: #c42b1c;
+  color: #ffffff;
+}
+
+.win-btn.close:active {
+  background: #b02a1e;
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .win-controls {
+    display: none;
+  }
+}
+
+/* 无边框窗口：内容圆角裁切（Win11 DWM 圆角之外再兜一层，避免直角溢出） */
+.app-root {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:root[data-maximized="1"] .app-root {
+  border-radius: 0;
 }

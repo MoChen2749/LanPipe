@@ -4,7 +4,11 @@
   <!-- 应用 -->
   <string key="app.name">LanPipe</string>
   <string key="app.subtitle">局域网传输</string>
-  <string key="app.version">版本 {version}</string>
+    <string key="window.minimize">最小化</string>
+  <string key="window.maximize">最大化</string>
+  <string key="window.restore">向下还原</string>
+  <string key="window.close">关闭</string>
+<string key="app.version">版本 {version}</string>
   <string key="identity.local">本机 · {name}</string>
 
   <!-- 导航 -->

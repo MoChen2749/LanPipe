@@ -261,6 +261,8 @@ fn main() {
             .inner_size(1040.0, 760.0)
             .min_inner_size(820.0, 560.0)
             .transparent(true)
+            // 自绘标题栏（WinUI 风格）：去掉系统标题栏，Mica/Acrylic 才能铺满整个窗口。
+            .decorations(false)
             .center()
             .on_page_load(|_window, payload| {
                 log(&format!("page_load {:?} {}", payload.event(), payload.url()));
@@ -280,6 +282,7 @@ fn main() {
 
             match window {
                 Ok(window) => {
+                    tune_window_frame(&window);
                     let backdrop = apply_backdrop(&window);
                     log(&format!(
                         "setup: window built, url={:?}, visible={:?}, backdrop={backdrop}",
@@ -306,6 +309,7 @@ fn main() {
             net::start_send,
             reveal_path,
             backdrop_info,
+            window_shadow,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run LanPipe");
@@ -394,6 +398,68 @@ fn apply_backdrop(window: &tauri::WebviewWindow) -> &'static str {
     }
     let _ = window;
     "none"
+}
+
+#[repr(C)]
+struct DwmMargins {
+    cx_left_width: i32,
+    cx_right_width: i32,
+    cy_top_height: i32,
+    cy_bottom_height: i32,
+}
+
+#[link(name = "dwmapi")]
+extern "system" {
+    fn DwmExtendFrameIntoClientArea(hwnd: isize, margins: *const DwmMargins) -> i32;
+
+    fn DwmSetWindowAttribute(
+        hwnd: isize,
+        attr: u32,
+        value: *const core::ffi::c_void,
+        size: u32,
+    ) -> i32;
+}
+
+/// 调窗口外框：去掉无边框窗口那圈生硬的 1px 黑边（保留柔和阴影），Win11 用圆角。
+fn tune_window_frame(window: &tauri::WebviewWindow) {
+    const DWMWA_BORDER_COLOR: u32 = 34;
+    const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
+    const DWMWCP_ROUND: u32 = 2;
+    const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
+
+    let Ok(hwnd) = window.hwnd() else { return };
+    let hwnd = hwnd.0 as isize;
+    unsafe {
+        // 无边框窗口必须把 DWM 边框向内扩 1px，系统才会绘制柔和阴影；
+        // 边框颜色随后设为"无"，避免出现那圈生硬的 1px 黑/白线。
+        let margins = DwmMargins {
+            cx_left_width: 1,
+            cx_right_width: 1,
+            cy_top_height: 1,
+            cy_bottom_height: 1,
+        };
+        let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
+        let none = DWMWA_COLOR_NONE;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR,
+            &none as *const u32 as *const core::ffi::c_void,
+            std::mem::size_of::<u32>() as u32,
+        );
+        let round = DWMWCP_ROUND;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &round as *const u32 as *const core::ffi::c_void,
+            std::mem::size_of::<u32>() as u32,
+        );
+    }
+}
+
+/// 当前环境是否使用系统窗口阴影（Win11 为 true）。
+#[tauri::command]
+fn window_shadow() -> bool {
+    windows_version::OsVersion::current().build >= 22000
 }
 
 /// 前端启动后读取，用于启用半透明层级样式。
