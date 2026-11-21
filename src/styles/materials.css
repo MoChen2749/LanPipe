@@ -79,8 +79,8 @@
 :root[data-backdrop="acrylic"] .info-pop,
 :root[data-backdrop="mica"] .toast,
 :root[data-backdrop="acrylic"] .toast {
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
-  backdrop-filter: saturate(1.8) blur(40px);
+  background: var(--surface);
+  backdrop-filter: none;
 }
 
 /* 移动端底部 Tab 用更明显的 Acrylic，浮在内容之上 */
