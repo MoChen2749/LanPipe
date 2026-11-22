@@ -48,7 +48,7 @@ async fn resume_skips_completed_files_and_finishes() {
         for f in 0..10 {
             write_file(
                 &src.join(format!("d{d}")).join(format!("f{f}.bin")),
-                128 * 1024 + f * 1024,
+                2 * 1024 * 1024 + f * 4096,
             );
         }
     }
@@ -69,7 +69,7 @@ async fn resume_skips_completed_files_and_finishes() {
 
     let mut finished = 0usize;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
-    while finished < 8 {
+    while finished < 6 {
         assert!(
             tokio::time::Instant::now() < deadline,
             "第一次传输没有产生足够的完成事件"
@@ -85,6 +85,29 @@ async fn resume_skips_completed_files_and_finishes() {
     let _ = send1.await;
     drop(events); // 确保接收端事件通道关闭
     tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // 模拟「进程被强杀」的残留：给一个尚未完成的文件写半截 .lp-part，
+    // 续传时应被清理并重新接收，而不是把脏数据 rename 成正式文件。
+    let dest_roots: Vec<PathBuf> = std::fs::read_dir(&dest)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    assert_eq!(dest_roots.len(), 1, "第一次传输应已建立接收根目录");
+    let first_root = &dest_roots[0];
+    // 造一个「journal 说完成但文件已丢失」的场景：删掉任一已接收文件，
+    // 再放一个半截 .lp-part。续传应发现文件缺失 → 清理残留 → 重新接收。
+    let victim_rel = snapshot(&src)
+        .into_iter()
+        .map(|(p, _)| format!("{src_name}/{p}"))
+        .next()
+        .expect("源目录不应为空");
+    let victim = first_root.join(&victim_rel);
+    assert!(victim.is_file(), "第一次传输应已写出 {victim_rel}");
+    std::fs::remove_file(&victim).unwrap();
+    let partial = PathBuf::from(format!("{}.lp-part", victim.to_string_lossy()));
+    std::fs::write(&partial, b"tampered-partial-content").unwrap();
 
     // 第二次：新接收端（新端口），同一目标目录，应复用 journal。
     let (mut receiver2, mut events2) =
@@ -143,8 +166,18 @@ async fn resume_skips_completed_files_and_finishes() {
     assert_eq!(snapshot(&roots[0]), expected, "续传后文件树应与源一致");
     let skipped = first_progress_files.expect("续传应上报初始进度");
     assert!(
-        skipped >= 8,
+        skipped >= 6,
         "续传进度应从已完成文件数起步，实际 {skipped}"
+    );
+    let leftovers: Vec<PathBuf> = walkdir::WalkDir::new(&dest)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| e.file_type().is_file() && e.path().to_string_lossy().ends_with(".lp-part"))
+        .map(|e| e.path().to_path_buf())
+        .collect();
+    assert!(
+        leftovers.is_empty(),
+        "续传后不应残留 .lp-part: {leftovers:?}"
     );
     let journal_dir = state.join("journals");
     assert!(

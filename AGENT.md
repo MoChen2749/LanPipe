@@ -130,7 +130,7 @@
 
 **落盘**：`<下载根>/<root_name>/<相对路径>.lp-part` → flush/fsync → `rename`；目录在 Accept 后后台创建；`root_name` 做单层校验（拒绝绝对路径与 `..`）。
 
-**续传**：`manifest_digest = xxh64(排序后的 path\0size\0mtime\0is_dir\n)`；接收端 journal `journals/<dest_key>-<digest>.jsonl` 记录 `{id,size,xxh64}` 与头部 `{"root": "<name>"}`，重发同一清单时跳过已完成文件；单文件内部偏移（`ResumeState.partial`）当前未启用。
+**续传**：`manifest_digest = xxh64(排序后的 path\0size\0mtime\0is_dir\n)`；接收端 journal `journals/<dest_key>-<digest>.jsonl` 记录 `{id,size,xxh64}` 与头部 `{"root": "<name>"}`，重发同一清单时跳过已完成文件；journal 默认保留 30 天并在接收会话开始时后台清理过期项（`journal::prune`）；单文件内部偏移（`ResumeState.partial`）当前未启用。
 
 **校验与重传**：接收端 `Done` 后回报全部文件哈希，发送端比对后只重传缺失/不一致文件（最多 3 轮）；失败文件记录在 `Resync{ids}`。
 
@@ -220,7 +220,7 @@ lanpipe/
 |---|---|---|
 | **M0 ✅** | 单机双实例 demo：拖拽 → 发现（多播/广播 + 手动 IP 兜底）→ 发送 → 进度 → 落盘校验；设置页；不做加密/续传/美化 | 已完成（2026-11-19） |
 | **M1 ✅（主体）** | 跨机双端（Windows ↔ WSL Ubuntu）、1x 磁盘、25 GB 实测、纠错重传、断点续传 L1（journal + 跳过已完成）、防火墙一键放行、托盘常驻、开机自启 | 已完成（2026-11-21） |
-| M1（剩余） | 真实物理机 1GbE 复测、kill -9/篡改续传测试、journal TTL 清理、小文件合批、诊断页后续扩展（发现报文） | 进行中 |
+| M1（剩余） | 真实物理机 1GbE 复测、小文件合批、诊断页后续扩展（发现报文） | 进行中 |
 | **M2 ✅（主体）** | GUI 重写：WinUI 3 / Fluent 2、模块化（单文件 ≤300 行）、i18n XML、深浅色、Mica/Acrylic、级联动效、无边框自绘窗口、短 ID/全子网扫描、桌面 + 窄屏/移动端布局 | 已完成（2026-11-21，tag `v0.1.0-m2`） |
 | M2（剩余） | 窄窗 <640 实机走查、Win11 真机材质/圆角/投影复核 | 进行中 |
 | M3 | 打包/签名/自动更新；macOS/Linux 构建；移动端（Android/iOS）评估 | 待定 |
@@ -369,7 +369,7 @@ lanpipe/
 
 - `crates/lanpipe-net/src/journal.rs`：`manifest_digest`（元数据稳定摘要）、journal 读写（JSONL，容忍坏行）、`JournalData{root_name, records}`。
 - 协议：`Offer.manifest_digest`、`Accept.resume = ResumeState{completed, partial}`（`partial` 预留 L2）。
-- 接收端：按摘要查 journal；只信任「目标文件存在且大小一致」的记录；复用 journal 头部记录的接收根名；未完成文件的 `.lp-part` 清理重传。
+- 接收端：按摘要查 journal；只信任「目标文件存在且大小一致」的记录；复用 journal 头部记录的接收根名；未完成文件的 `.lp-part` 清理重传；启动接收会话时后台清理过期 journal（30 天）。
 - 发送端：跳过 completed，进度以已完成字节/文件数初始化；Verify 时对已完成文件用接收端 journal 的 xxh64 比对。
 - 测试：`journal` 单测 + `tests/resume.rs`（中途掐断接收端→重启→续传，断言单根、文件树一致、进度从已完成数起步、journal 存在）。
 - 待办（L2）：`FileOffset` 单文件偏移续传、块级 bitmap、状态目录 TTL 清理。

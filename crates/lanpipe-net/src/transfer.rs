@@ -538,6 +538,14 @@ async fn handle_conn(
             // 续传时复用上次的接收根目录（journal 头部记录），否则新开一个根。
             let digest = offer.manifest_digest.clone();
             let state_root = journal::default_state_dir();
+            // 顺手清理过期 journal（默认 30 天）：不阻塞运行时，失败也不影响本次传输。
+            {
+                let prune_root = state_root.clone();
+                let _ = tokio::task::spawn_blocking(move || {
+                    journal::prune(&prune_root, journal::JOURNAL_TTL_SECS)
+                })
+                .await;
+            }
             let journal_data = if digest.is_empty() {
                 journal::JournalData::default()
             } else {

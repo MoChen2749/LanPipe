@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use lanpipe_proto::ManifestEntry;
 use xxhash_rust::xxh64::xxh64;
@@ -49,6 +50,46 @@ pub fn default_state_dir() -> PathBuf {
         }
     }
     std::env::temp_dir().join("lanpipe-state")
+}
+
+/// journal 默认保留时长：30 天。过期条目对应的是很久以前的中断任务，继续复用的价值很低。
+pub const JOURNAL_TTL_SECS: u64 = 30 * 24 * 60 * 60;
+
+/// 清理 `state_dir/journals` 下修改时间早于 `now - max_age_secs` 的 journal，返回删除数量。
+pub fn prune(state_dir: &Path, max_age_secs: u64) -> usize {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    prune_before(state_dir, now.saturating_sub(max_age_secs))
+}
+
+/// 删除修改时间早于 `cutoff_secs`（Unix 秒）的 journal 文件；`cutoff_secs = 0` 时全部保留。
+pub fn prune_before(state_dir: &Path, cutoff_secs: u64) -> usize {
+    let dir = state_dir.join("journals");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        let Ok(modified) = meta.modified() else {
+            continue;
+        };
+        let Ok(since) = modified.duration_since(UNIX_EPOCH) else {
+            continue;
+        };
+        if since.as_secs() < cutoff_secs && std::fs::remove_file(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
 }
 
 #[derive(Debug, Clone, Default)]
@@ -210,5 +251,41 @@ mod tests {
         assert_eq!(loaded.records.get(&7).map(|r| r.size), Some(123));
         assert_eq!(loaded.records.get(&8).map(|r| r.xxh64), Some(1));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn prune_removes_only_expired_journals() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/test-tmp")
+            .join(format!("lanpipe-prune-{}", std::process::id()));
+        let journals = root.join("journals");
+        std::fs::create_dir_all(&journals).unwrap();
+        let keep = journals.join("keep-1.jsonl");
+        let drop = journals.join("drop-1.jsonl");
+        std::fs::write(&keep, b"{}\n").unwrap();
+        std::fs::write(&drop, b"{}\n").unwrap();
+
+        // cutoff=0：什么都不删
+        assert_eq!(prune_before(&root, 0), 0);
+        assert!(keep.exists() && drop.exists());
+
+        // cutoff 设为未来：两个都算过期
+        let future = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600;
+        assert_eq!(prune_before(&root, future), 2);
+        assert!(!keep.exists() && !drop.exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn prune_ignores_missing_directory() {
+        let missing = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/test-tmp")
+            .join("lanpipe-prune-missing");
+        let _ = std::fs::remove_dir_all(&missing);
+        assert_eq!(prune(&missing, JOURNAL_TTL_SECS), 0);
     }
 }
