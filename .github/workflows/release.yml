@@ -1,0 +1,83 @@
+name: Release
+
+# 推送 tag（例如 v0.1.1）触发：构建 MSI + 便携版 + 签名 + 自动更新清单 latest.json，并创建 GitHub Release。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 构建并发布
+    runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 缓存
+        uses: swatinem/rust-cache@v2
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 构建前端
+        run: npm run build
+
+      - name: 打包 MSI（带更新签名）
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          cd apps/desktop/src-tauri
+          npx --no-install tauri build --bundles msi
+        shell: powershell
+
+      - name: 打包便携版
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/make-portable.ps1
+        shell: powershell
+
+      - name: 生成 latest.json
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart("v")
+          $msi = Get-ChildItem target/release/bundle/msi/*.msi | Select-Object -First 1
+          $url = "https://github.com/${{ github.repository }}/releases/download/$tag/$($msi.Name)"
+          $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}"
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/publish-release.ps1 `
+            -Installer $msi.FullName -Version $version -Url $url -Notes "LanPipe $version" `
+            -OutFile target/release/bundle/latest.json
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: LanPipe ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/msi/*.msi.sig
+            target/release/bundle/portable/*.zip
+            target/release/bundle/latest.json
+
+      - name: 上传构建产物（调试用）
+        uses: actions/upload-artifact@v4
+        with:
+          name: LanPipe-${{ github.ref_name }}
+          path: |
+            target/release/bundle/msi/*
+            target/release/bundle/portable/*
+            target/release/bundle/latest.json

@@ -1,260 +1,309 @@
 # LanPipe
 
-> 局域网文件传输：**零暂存、逐文件直写、多流并行**。拖入文件夹 → 选择设备 → 发送，不做整包归档。
-> 目标平台：Windows / macOS / Linux（Tauri 跨端）；M0 先 Windows。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](apps/desktop/src-tauri/tauri.conf.json)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#4-多端部署)
+[![CI](https://img.shields.io/badge/CI-pending-lightgrey.svg)](#10-开发)
 
-## 现在能做什么（M0）
+LanPipe 是一款面向可信局域网的批量文件直传工具：把文件或目录拖入窗口、选择目标设备即可开始传输，接收端按文件边收边写，不做整包归档。
 
-- ✅ 桌面应用（Rust + Tauri v2 + 原生 WebView2，**无控制台窗口**，前端资源内嵌单文件）
-- ✅ **局域网发现**：UDP 53310 多播 `239.255.42.99` + 受限广播双通道，2s 公告、5s 超时
-- ✅ **LP/1 传输引擎**：TCP 53311 控制连接 → Offer/Accept → N 条流并行传 DATA 帧 → 逐文件 `.lp-part` → fsync 语义关闭 → 原子 rename
-- ✅ **零额外磁盘**：接收端边收边写目标文件，不落地任何 zip/tar 归档；实测峰值额外占用 ≈ 0
-- ✅ **GUI 全流程**：拖放汇总 → 设备列表点击即发 → 进度条/百分比/速度 → 接收完成提示
-- ✅ **设置持久化**：设备名、接收目录、设备 ID、监听端口、并发流数（1–8）、压缩开关；`%APPDATA%\LanPipe\config.json`
-- ✅ **多实例自测**：`--instance b` 使用独立配置目录与偏移端口（53320/53321）
-- ✅ **无界面发送模式**（便于脚本/自测）：`LanPipe.exe --send 192.168.1.5:53311 D:\Games --streams 4`
-- ⏳ M1：断点续传、文件级 xxHash 校验、防火墙一键放行、托盘、打包安装器
+当前版本 `0.1.0`。Windows 桌面端是已验证的交付形态，Linux CLI 已在测试中验证；macOS 与 Linux 桌面端尚未验证。
 
-## 实测（本机 loopback，已预热）
+## 1. 项目定位与适用场景
 
-| 数据集 | 流数 | 耗时 | 吞吐 |
-| --- | --- | --- | --- |
-| 903 文件 / 63.9 MiB（900 小文件 1–8 KiB + 3×20 MiB） | 1 | 3.26 s | 19.6 MiB/s · 277 文件/s |
-| 同上 | 2 | 1.76 s | 36.4 MiB/s · 514 文件/s |
-| 同上 | **4** | **1.30 s** | **51.4 MiB/s · 693 文件/s** |
-| 同上 | 8 | 1.27 s | 52.9 MiB/s · 715 文件/s |
-| 3×20 MiB 大文件 | 1 | 0.257 s | 233 MiB/s |
-| 3×20 MiB 大文件 | 4 | 0.213 s | **295 MiB/s** |
+LanPipe 解决的是「两台设备之间搬运大量文件」这一类需求：不经过云端、不需要账号、不在接收端额外生成一份完整副本。发送端把文件流直接写进接收目录，每个文件完成后再落定。
 
-接收结果校验：903 文件 / 66,956,746 B 与源完全一致，无 `.lp-part`/`.zip`/`.tar` 残留。
-对比参考：本机 tar 管道（无网络）小文件上限约 2,598 文件/s，LanPipe 目前约 693（4 流），瓶颈在逐文件建文件/改名与帧开销，M1 计划做小文件合批优化。
+| 适用场景 | 说明 |
+| --- | --- |
+| 局域网内迁移大型目录 | 游戏目录、素材库、工程备份等，单次数十 GB、数万文件 |
+| 大批量小文件传输 | 接收端逐文件写入，不打包、不解包 |
+| 隔离网络内部转运 | 数据不出内网，无外部依赖 |
+| 接收端磁盘空间紧张 | 不需要为接收预留与源等量的镜像空间 |
 
-## 环境要求
+> **安全边界（务必阅读）**
+>
+> LanPipe 仅推荐在**可信局域网**内使用。发现报文与文件数据都不经过云端或第三方中继；程序不面向公网暴露。
+> 当前版本**没有加密，也没有身份认证**：同网段内任意运行 LanPipe 的实例都能发现设备并向其发送文件，接收端对发现到的发送方**自动接受**，不会弹出确认。
+> 请勿在公共 Wi-Fi、访客网络、宿舍/办公共享网络或其他不受信任的网段运行。
 
-| 依赖 | 版本 | 说明 |
-| --- | --- | --- |
-| Windows | 10/11 或 Server 2019+ | 本机为 Windows Server 2022 |
-| Rust | stable（MSVC 工具链） | `rustup` 安装；构建需要 VS Build Tools 的 C++ 组件 |
-| Node.js | ≥ 18 | 构建前端（Vite） |
-| WebView2 | Evergreen | Win10/11 自带；Server 需单独安装运行时 |
+明确的非目标：
 
-## 构建（双击 `build.bat`）
+- 不提供公网穿透、NAT 中继、账号体系与云同步；
+- 不做持续双向同步（不是网盘客户端）；
+- 只使用自有 LP/1 协议；不兼容第三方传输协议，也不与其互操作。
 
-`build.bat` 是双击即用的交互式菜单（也支持参数：`build.bat build|clean|run|dev|check|cross`）：
+## 2. 核心特性
 
+| 特性 | 说明 |
+| --- | --- |
+| 多流并行传输 | 1–8 条 TCP 数据流，默认 4；多个小文件按文件并发传输 |
+| 零暂存接收 | 每个文件写入 `<文件名>.lp-part`，完成后 flush 并原子重命名 |
+| 完整性校验 | 每个文件计算 xxHash64；校验失败按文件重传，最多 3 轮 |
+| 断点续传（文件级） | 以 manifest 摘要为键记录 journal，重新发送同一目录时跳过已完成文件 |
+| 自动发现 | UDP 53310 多播 `239.255.42.99` 与受限广播，2 秒一次，5 秒无心跳判离线 |
+| 直连与短号 | 支持 `IP[:端口]` 直连，也支持 IPv4 末段短号（如 `5`、`005`）扫描定位 |
+| 桌面体验 | 五页导航（发送/接收/历史/诊断/设置）、拖放、窄屏自适应；Mica/Acrylic 材质仅 Windows |
+| 系统集成 | 托盘、开机自启、防火墙一键放行（UAC）、单实例 |
+| 发行形态 | MSI 安装包（中文/英文）与便携 zip；自动更新骨架已接入（更新端点尚未部署） |
+
+## 3. 快速开始
+
+### 3.1 使用安装包（Windows，推荐）
+
+双击 `LanPipe_0.1.0_x64_zh-CN.msi`（位于 `target\release\bundle\msi\`，或随发行包提供）按向导安装；静默安装（需要管理员权限）：
+
+```powershell
+msiexec /i "LanPipe_0.1.0_x64_zh-CN.msi" /qn
 ```
-1) 清理构建产物       2) 构建 Release 单文件 exe
-3) 运行（自动部署）   4) 开发模式（Vite+cargo run）
-5) 交叉编译           6) 环境自检
-0) 退出
-```
 
-产物：`dist-bin\LanPipe.exe`，并自动部署到 `%LOCALAPPDATA%\Programs\LanPipe\LanPipe.exe`（菜单 3 直接启动）。
-配置文件：`%APPDATA%\LanPipe\config.json`（可写性失败时回退 exe 同目录便携模式）。
+默认安装到 `C:\Program Files\LanPipe`，同时创建开始菜单快捷方式与卸载项。
 
-命令行等价构建：
+### 3.2 使用便携版
 
-```bat
-call npm install
-call npm run build
+解压 `LanPipe_0.1.0_x64-portable.zip`（位于 `target\release\bundle\portable\`），运行其中的 `LanPipe.exe`。配置写入 `%APPDATA%\LanPipe`；移除程序时退出托盘中的进程并删除解压目录即可，配置目录按需清理。
+
+### 3.3 从源码构建（Windows）
+
+前置条件：Windows 10/11 或同代 Windows Server（测试环境为 Server 2022）、Rust stable（MSVC 工具链）、Node.js 18 及以上、WebView2 Runtime（见 [docs/INSTALL.md](docs/INSTALL.md)）。
+
+```powershell
+npm install
+npm run build
 cargo build --release --features custom-protocol -p lanpipe
-copy target\release\lanpipe.exe "%LOCALAPPDATA%\Programs\LanPipe\LanPipe.exe"
 ```
 
-> `--features custom-protocol` 必须带：不带时 Tauri 会把应用当作 `tauri dev` 模式，去加载 `http://localhost:1420`，产生白屏。
-> 开发模式（`build.bat` 选项 4 / `cargo run`）则**不要**带该 feature，它会连接 Vite dev server 并支持热更新。
+产物为 `target\release\lanpipe.exe`。也可以运行仓库根目录的 `build.bat`，按菜单提示完成构建，脚本会把可执行文件部署到 `%LOCALAPPDATA%\Programs\LanPipe\LanPipe.exe` 并复制到 `dist-bin\`。
 
-> 本机注意：当前开发机对「位于工作区 `F:\Projects` 内的可执行文件」有沙箱限制（只能写工作区路径），因此工作区内的 `dist-bin\LanPipe.exe` 直接双击会因无法创建 WebView2 数据目录而白屏/被拦截。
-> `build.bat` 会自动部署到 `%LOCALAPPDATA%\Programs\LanPipe\LanPipe.exe`，请从那里运行。
+发布构建必须带 `--features custom-protocol`；缺少该 feature 时程序会尝试加载开发服务器地址，表现为空白窗口。开发调试使用 `npm run dev` 配合 `cargo run -p lanpipe`（不带该 feature）。
 
-## 自测
+### 3.4 完成第一次传输
 
-单机双进程（接收端 GUI + 发送端 CLI）：
+1. 两台设备接入同一局域网，分别启动 LanPipe；接收端保持运行或最小化到托盘。
+2. 发送端把文件或目录拖入窗口，在设备列表点击目标设备；也可以输入 IP 或尾号直连。
+3. 接收端自动接受，文件写入默认目录 `%USERPROFILE%\Downloads\LanPipe\LanPipe-<Unix 秒>\`，可在设置中修改。
+4. 传输结束后在「历史」查看结果；校验失败的文件会自动重传。
 
-```bat
-:: 1) 启动 GUI（接收端），保持运行
-%LOCALAPPDATA%\Programs\LanPipe\LanPipe.exe
+## 4. 多端部署
 
-:: 2) 另开终端，用 CLI 发送（PowerShell 对 GUI 子系统 exe 不会等待，需 -Wait）
-Start-Process "$env:LOCALAPPDATA\Programs\LanPipe\LanPipe.exe" -Wait -NoNewWindow `
-  -ArgumentList @('--send','127.0.0.1:53311','D:\Games','--streams','4')
+| 平台 | 形态 | 状态 | 入口 |
+| --- | --- | --- | --- |
+| Windows 10/11 | 桌面 GUI（MSI / 便携 zip） | 已验证（测试环境为 Server 2022） | 本文 §3 |
+| Windows ARM64 | 交叉编译 | 构建脚本支持，运行未验证 | `build.bat` 交叉编译项 |
+| Linux（WSL2 Ubuntu 24.04） | CLI | 已在测试中验证 | [docs/INSTALL.md](docs/INSTALL.md) §2.1 |
+| Linux 桌面 | GUI（deb / AppImage） | 未验证 | [docs/INSTALL.md](docs/INSTALL.md) §2.2 |
+| macOS | GUI（app / dmg） | 未验证 | [docs/INSTALL.md](docs/INSTALL.md) §3 |
+| 移动端（Android / iOS） | — | 规划中 | M3 评估项 |
 
-:: 3) 查看结果（CLI 与 GUI 日志已分离）
-type "%TEMP%\LanPipe\cli-send.log"
-```
+安装、源码构建、防火墙配置与常见问题的完整说明见 [docs/INSTALL.md](docs/INSTALL.md)。
 
-断言：`%USERPROFILE%\Downloads\LanPipe\LanPipe-<ts>\` 下文件树与源一致，无 `.lp-part`。
+## 5. 使用说明
 
-端到端测试（协议层，不需 GUI）：
+### 5.1 发送
 
-```bat
-cargo test -p lanpipe-net
-```
+- **拖放 + 点击设备**：把文件或目录拖入发送页，设备列表会显示当前发现的在线设备，点击即发送。
+- **IP 直连**：输入 `192.168.1.5` 或 `192.168.1.5:53311`；输入 1–3 位尾号（如 `5`、`005`）时，对本机各网卡所在网段做尾号扫描。
+- **命令行**：`LanPipe.exe --send 192.168.1.5:53311 D:\Games --streams 4`。
 
-## 目录结构
+传输中断后，再次向同一接收端发送同一目录即可续传：journal 记录已完成的文件，未完成文件的 `.lp-part` 会被清理后重传。续传目前为文件级，单个文件内部的偏移续传尚未实现。
 
-```
-lanpipe/
-├─ AGENT.md                 # 项目方向定稿（技术选型/协议/里程碑/验收）
-├─ build.bat                # 双击即用构建脚本
-├─ index.html, src/         # 前端（TypeScript + Vite，M0 无框架）
-├─ crates/
-│  ├─ lanpipe-proto/        # LP/1 帧格式与消息（Offer/Accept/DATA/FileDone/Done）
-│  └─ lanpipe-net/          # UDP 发现 + TCP 传输引擎（多流、零暂存）
-└─ apps/desktop/src-tauri/  # Tauri v2 应用（命令、设置、事件桥接）
-```
+### 5.2 接收
 
-## 协议要点（LP/1）
+- 接收端自动接受连接并开始写入，没有确认弹窗；这是当前版本的设计取舍，也意味着同网段任意 LanPipe 实例都能向本机推送文件。
+- 每次会话在接收目录下新建 `LanPipe-<Unix 秒>` 子目录，目录名由发送端在开始传输时生成，接收端按该名称落盘；续传时复用 journal 记录的目录名。
+- 正在写入的文件带 `.lp-part` 后缀，完成后去除；中断残留的 `.lp-part` 在下次对同一目录续传时清理。
 
-- UDP 53310：JSON 公告 `{v,id,name,addrs,port}`；每块网卡分别发多播 + 子网广播，收端按“主用网段”挑选对端地址。
-- TCP 53311：控制连接 → `Offer`（manifest：path/size/mtime/is_dir）→ `Accept` → N 条流（每流 `Hello`）→ `DATA`（`id|offset|bytes`）→ `FileDone` → 最后 `Done`。
-- 安全：接收端拒绝绝对路径与 `..`，只允许写入接收目录之下。
-- 落盘：`.lp-part` → flush → rename；不逐文件 `fsync`（与 tar/robocopy 基线一致，换取吞吐；掉电一致性留待 M1 checkpoint）。
-- 校验纠错：每文件边传边算 xxHash64，`Done` 后接收端回 `Verify`，发送端比对后对缺失/不符文件发 `Resync{ids}` 重传（最多 3 轮），通过回 `Complete`。0 字节文件无 DATA 帧，由 `finish_empty_file` 直接建空文件并计数。
-- 逐文件 `FileReceived` 事件不转发前端（万级文件时 IPC 会吃吞吐），只上报节流后的进度。
+### 5.3 设置与诊断
 
-## 路线图（2026-11-20 调整：不做 LocalSend 兼容，转向 GUI 重写与多端适配）
-
-| 阶段 | 内容 |
+| 设置项 | 默认值 |
 | --- | --- |
-| M0 ✅ | 发现 + 发送/接收 + 设置页 + CLI 自测 + 单 exe |
-| M1 | 断点续传（中断后继续）、小文件合批、防火墙一键放行、托盘 |
-| M2 | TLS、打包安装器、自动更新评估、诊断页 |
-| M2 | GUI 重写（WinUI3/Fluent 视觉 + 组件化 + 深浅色）+ 桌面三端适配 |
-| M3 | 打包/签名/自动更新；移动端评估（**不做 LocalSend 协议兼容**） |
+| 接收目录 | `%USERPROFILE%\Downloads\LanPipe` |
+| 设备名 | 主机名 |
+| 设备 ID | 首次启动生成的 UUIDv4 |
+| 监听端口 | UDP 53310 / TCP 53311 |
+| 并发流 | 4（可调 1–8） |
+| 压缩 | 关闭 |
+| 托盘 | 常驻，关闭主窗口时收进托盘 |
+| 开机自启 | 关闭，可手动启用 |
 
-详见 [AGENT.md](AGENT.md)。
+- 配置文件：`%APPDATA%\LanPipe\config.json`，写入采用原子替换；解析失败时备份为 `config.json.bad` 并回退默认值。
+- 日志：GUI 为 `%TEMP%\LanPipe\lanpipe.log`，CLI 发送为 `%TEMP%\LanPipe\cli-send.log`。
+- 诊断页显示配置路径、设备 ID、端口、WebView2 版本、连通性检查与透明回退状态。
+- 单实例运行：关闭主窗口会收进托盘，从托盘菜单退出后进程才结束。
 
-## 本轮修复（2026-11-19，针对 Minecraft 目录实测反馈）
+### 5.4 命令行接口
 
-- **文件数不完整** → 根因是 0 字节文件不产生 DATA 帧、接收端 `finish_file` 提前返回：既不建文件也不计数，`files_done` 永远追不平，最终不触发"接收完成"。已修（`finish_empty_file`），`开服侠（生存）` 128 文件（含 0 字节 `server/permissions.yml`）端到端一致。
-- **纠错机制** → `Verify / Resync / Complete` 三轮握手：接收端报告每文件 xxHash64，发送端只重传差异文件（比按流重传更精确）。故障注入测试（`LANPIPE_FAULT_DROP_HASH=1`）通过，重传后文件树与源完全一致。
-- **设备发现** →
-  - 每块网卡单独发公告（多播 + 子网定向广播），修复多网卡/VPN 机器公告只走 WSL 网卡的问题；
-  - 公告携带本机全部 IPv4，接收端优先选与"默认路由网卡"同 /24 的地址，UI 不再显示 10.255.x 这类虚拟网卡地址；
-  - 主进程每 2s 重发一次 `peers:update`，UI 增加「刷新」按钮 + 每 4s 自动轮询，解决"上线后看不到设备"。
-- **IP 直连** → 支持只输最后一段（如 `5`），自动扫描本机各网段 `x.y.z.5:53311`；也可输入完整 `IP:端口`。
-- **并发语义** → UI 明确为"发送并发流数（发送端设置，接收端自动适配）"。
-- **同机双实例** → `--instance b` 只偏移 TCP（UDP 发现端口保持 53310），且只在首次生成配置时偏移，端口不再每次启动漂移。
-- **性能回归**（本机 loopback）：`开服侠（生存）` 128 文件/96 MB 0.35s（缓存命中）；`1.12.2` 488 文件/510 MB **5.03s ≈ 106 MB/s**（受 F: 双 HDD 镜像卷 ~125MB/s 上限约束）。
+`lanpipe-cli` 用于无界面环境（Linux、WSL、脚本化测试）：
 
----
+```text
+lanpipe-cli recv --dest <目录> [--name 名称] [--id ID] [--udp 53310] [--tcp 53311]
+lanpipe-cli send <ip:port> <路径>... [--streams N]
+```
 
-## 跨机实测（2026-11-19，Windows ↔ WSL Ubuntu 24.04）
+接收端启动后打印 `READY`、`PEER-UP`、`RECEIVED` 等事件行，便于脚本判断进度。
 
-> 环境：宿主 Windows Server 2022（Xeon E5-2680 v4 / 28 线程 / F: 双 HDD 镜像卷）；对端为 WSL2 中的 Ubuntu 24.04 + 自制 `lanpipe-cli`（同源码交叉构建）。WSL2 与宿主之间是虚拟 NAT，**不是真实 1GbE 链路**，因此带宽数字只用于验证功能链路，不代表 LAN 吞吐上限。
+## 6. 架构概览
 
-| 用例 | 结果 |
+```mermaid
+flowchart LR
+  UI["前端 src/<br/>TypeScript + Vite"] -->|Tauri IPC| APP["apps/desktop/src-tauri<br/>命令 · 设置 · 防火墙 · 托盘"]
+  APP --> NET["crates/lanpipe-net<br/>发现 · 会话 · 传输 · journal"]
+  NET --> PROTO["crates/lanpipe-proto<br/>LP/1 帧与常量"]
+  NET <-->|"UDP 53310 发现<br/>TCP 53311 控制 + 数据"| PEER["对端 LanPipe"]
+  NET --> DEST["接收目录<br/>*.lp-part → rename"]
+  APP --> CFG["配置目录<br/>config.json"]
+```
+
+| 层 | 位置 | 职责 |
+| --- | --- | --- |
+| 前端 | `src/` | 视图与交互、状态管理、i18n、样式与材质 |
+| 桌面外壳 | `apps/desktop/src-tauri/` | Tauri 命令与事件、设置读写、防火墙、托盘、单实例、更新检查 |
+| 传输核心 | `crates/lanpipe-net/` | 设备发现、连接与会话、多流传输、校验重传、journal 续传 |
+| 协议定义 | `crates/lanpipe-proto/` | LP/1 帧格式、端口与帧长常量 |
+| 命令行 | `apps/cli/` | 无界面接收/发送 |
+
+| 协议要点 | 值 |
 | --- | --- |
-| 双向自动发现 | ✅ 宿主看到 `WSL-Ubuntu 172.18.249.169:53311`；WSL 看到 `WIN-2H1782KNJDF 172.18.240.1:53311` |
-| host → WSL（游戏目录 128 文件 / 91.6 MiB，含 0 字节文件） | ✅ 0.5s；接收端 128 文件完全一致，`permissions.yml` 0 字节保留，无 `.lp-part` |
-| WSL → host（488 文件 / 510 MiB） | ✅ 5.5s（约 92.6 MiB/s；WSL 读 `/mnt/f` 的 9p 开销为主），文件树完全一致 |
-| 纠错重传（接收端 `LANPIPE_FAULT_DROP_HASH=1` 注入坏哈希） | ✅ `Verify → Resync → 重传 → Complete` 后 128/128 一致，只上报 1 次 `RECEIVED` |
-| 0 字节文件 | ✅ 保留（空文件也走 `.lp-part → rename`） |
-| 25 GB 全量（43,594 文件 / 25.0 GB，F: 游戏目录 → WSL） | ✅ 22.3 min（≈18.7 MB/s，源 HDD IOPS 限制）；逐文件清单一致，`.lp-part` 0 |
-| Windows 防火墙 | 入站规则须限定 `-RemoteAddress LocalSubnet`（TCP/UDP 53310-53311、53320-53321），否则 WSL/其它主机连不进来 |
+| 发现 | UDP 53310，多播 `239.255.42.99` + 受限广播，2 s 间隔，5 s 无心跳判离线 |
+| 控制与数据 | TCP 53311；N 条数据流（默认 4，可配 1–8） |
+| 帧上限 | 数据帧 4 MiB，控制帧 64 MiB |
+| 校验 | 每文件 xxHash64；失败文件重传，最多 3 轮 |
+| 续传 | journal（JSONL）记录已完成文件，状态目录可配置 |
+| 传输安全 | 明文，无加密、无认证（当前限制） |
 
-构建 Linux 端（WSL）：
+端口均大于 1024，绑定不需要管理员权限；但 Windows 防火墙仍需放行入站规则，否则对端无法连接。
 
-```bash
-sudo apt-get install -y build-essential
-curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-cd /mnt/f/Projects/lanpipe && cargo build --release -p lanpipe-cli
-./target-linux/release/lanpipe-cli recv --dest /tmp/recv --name WSL-Ubuntu
+## 7. 性能实测
+
+以下数字来自本机回环与虚拟机链路，**不代表真实物理网卡上限**。本机回环数据来自旧版 README 记录；跨机与 25 GB 用例的原始记录见 [docs/TEST-REPORT-2026-11-19.md](docs/TEST-REPORT-2026-11-19.md)。
+
+### 7.1 本机回环（loopback）
+
+数据集：903 个文件 / 63.9 MiB（900 个 1–8 KiB 小文件 + 3 个 20 MiB 大文件）。数据来自旧版 README 记录的本机回环测试。
+
+| 并发流 | 耗时 | 吞吐 | 文件速率 |
+| --- | --- | --- | --- |
+| 1 | 3.26 s | 19.6 MiB/s | 277 文件/s |
+| 2 | 1.76 s | 36.4 MiB/s | 514 文件/s |
+| 4 | 1.30 s | 51.4 MiB/s | 693 文件/s |
+| 8 | 1.27 s | 52.9 MiB/s | 715 文件/s |
+
+纯大文件（3 × 20 MiB）：1 流 0.257 s（约 233 MiB/s），4 流 0.213 s（约 295 MiB/s）。接收端 903 个文件、66,956,746 字节与源完全一致，无残留。
+
+### 7.2 Windows ↔ WSL2（虚拟链路）
+
+测试环境：Windows Server 2022（Xeon E5-2680 v4 / 28 线程 / 64 GB，F: 为双 HDD 镜像卷，顺序写约 125 MiB/s）↔ WSL2 Ubuntu 24.04（NAT 网段 172.18.x），非真实千兆网卡。
+
+| 用例 | 数据量 | 结果 |
+| --- | --- | --- |
+| host → WSL | 128 文件 / 91.6 MiB | 370–500 ms 完成 |
+| WSL → host | 488 文件 / 510 MiB | 5.5–5.6 s，约 92.6 MiB/s（受 WSL 读取 `/mnt/f` 的 9p 带宽限制） |
+| 25 GB 压测 | 43,594 文件 / 25,001,024,890 字节 | 22.3 分钟，约 18.7 MB/s（受源 HDD IOPS 限制） |
+
+### 7.3 结论与局限
+
+- 25 GB 用例逐文件清单一致，`.lp-part` 残留为 0，6,354 个 0 字节文件处理正确。
+- 真实物理 1 GbE / 2.5 GbE 环境尚未实测（待验证）；AGENT.md §10 中「1GbE 混合目录 ≥100 MiB/s」仍未给出实测结论。
+- 本机小文件吞吐低于 tar 管道基线（约 2,598 文件/s），小文件合批优化仍在计划中。
+- 早期构建产物尺寸与当前源码版本不一致，不引用为性能指标。
+
+## 8. 已知限制
+
+### 8.1 安全与网络
+
+- **无加密、无认证**：发现与传输均为明文；同网段任意 LanPipe 实例可发现设备并推送文件，接收端自动接受。仅可在可信局域网使用。
+- **仅面向局域网**：不提供公网穿透、中继或 NAT 穿透能力；发现依赖 IPv4 多播/广播，跨网段需 IP 直连。
+- 未实现发送前目标磁盘空间预检，空间不足时以单文件写入失败的形式暴露。
+
+### 8.2 功能边界
+
+- 断点续传为文件级（L1），单文件内部偏移续传（L2）未实现。
+- 不逐文件 `fsync`：完成文件采用 flush + rename，掉电等强一致场景无保证。
+- 压缩默认关闭；对已压缩内容（游戏、视频、素材）开启压缩无收益且增加 CPU 消耗。
+- 「1 万小文件 ≥1800 文件/s」的验收指标尚未达成，当前本机实测约 700 文件/s。
+- 单实例限制：已有实例运行时，第二次启动的 `--send` 参数会被忽略，需先从托盘退出。
+
+### 8.3 平台与打包
+
+- Windows 是唯一完成桌面验证的平台；macOS 与 Linux 桌面端未验证。
+- WebView2 145.x / 154.x 存在窗口透明回归（上游 #5481、#5752），程序会自动回退纯色背景，诊断页显示 WebView2 版本与回退提示。
+- NSIS 安装包静默安装（`/S`）返回 0 但不落盘，当前不作为交付形态（待查）；MSI 为主交付。
+- 自动更新端点为占位 `https://example.invalid/lanpipe/latest.json`，检查更新必然失败；正式发布需替换端点并配置签名密钥。
+- 目前只发布 x64 MSI 与便携 zip。
+
+## 9. 文档索引
+
+| 文档 | 内容 |
+| --- | --- |
+| `README.md` | 本文件：项目定位、核心特性、快速开始、实测摘要与安全边界 |
+| [docs/INSTALL.md](docs/INSTALL.md) | Windows / Linux / macOS 安装、源码构建、防火墙配置、FAQ |
+| [docs/PROTOCOL-LP1.md](docs/PROTOCOL-LP1.md) | LP/1 协议：发现、控制、数据帧、续传 journal（随代码同步） |
+| [docs/UI-DESIGN.md](docs/UI-DESIGN.md) | 界面规范、布局与视觉基线 |
+| [docs/TEST-REPORT-2026-11-19.md](docs/TEST-REPORT-2026-11-19.md) | 测试环境、用例与原始数据 |
+| [docs/ui/](docs/ui/) | 线框图：发送、接收、设置、移动端 |
+| [AGENT.md](AGENT.md) | 项目定位、硬约束、里程碑与开发约定（方向变更的唯一依据） |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 分支模型、提交规范、合并前检查、发布流程 |
+| [docs/TEAM.md](docs/TEAM.md) | 角色分工、交接清单、密钥与发布检查表 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
+
+## 10. 开发
+
+### 10.1 环境要求
+
+| 依赖 | 说明 |
+| --- | --- |
+| Rust | stable，版本由 `rust-toolchain.toml` 固定；含 rustfmt、clippy |
+| Node.js | 18 及以上（Vite 6 要求） |
+| C/C++ 工具链 | Windows 用 MSVC Build Tools；Linux 用 build-essential |
+| 系统运行时 | Windows 需 WebView2 Runtime；Linux 桌面需 webkit2gtk 等依赖 |
+
+### 10.2 常用命令
+
+```powershell
+npm install                 # 安装前端依赖
+npm run build               # tsc --noEmit + vite build，产物在 dist/
+cargo build --release --features custom-protocol -p lanpipe
+cargo test                  # 工作区全部测试
+cargo test -p lanpipe-net   # 协议与传输端到端测试
+cargo clippy --workspace --all-targets -- -D warnings
+build.bat package           # 打包 MSI + 便携 zip（含 SHA256 汇总）
+build.bat test              # 代码门禁：cargo test + clippy
+node tools/check-i18n.mjs   # 校验 i18n key 使用情况
 ```
 
-## 已知限制
+前端必须先构建：`frontendDist` 指向 `dist/`，直接执行 cargo 构建会得到旧的或缺失的前端产物。
 
-- 同机双实例共用 UDP 发现端口时依赖 SO_REUSEADDR，行为取决于系统；跨机是正常路径。
-- 尚无断点续传/会话恢复；传输中断需整目录重传（M1）。
-- 未做逐目录 fsync（与 tar/robocopy 一致），需要掉电强一致时由调用方加 checkpoint（M1）。
-- 大文件单流上限受磁盘；小文件吞吐仍低于 `tar|bsdtar` 基线（M1 计划批量合并小文件帧）。
+### 10.3 调试与本地验收
 
-## 传输稳健性（2026-11-19 晚）
+- 开发模式：`npm run dev` 启动 Vite，另开终端 `cargo run -p lanpipe`（不带 `custom-protocol`）。
+- 同机双实例自测：`--instance b`，配置目录为 `%APPDATA%\LanPipe-b`；首次生成配置时 TCP 端口整体 +10，UDP 不变。
+- 界面截图：以 `LANPIPE_CDP=9333` 启动应用，再运行 `node tools/ui-shot.mjs 9333 shot.png [navIndex]`（`navIndex` 0–4 对应发送、接收、历史、诊断、设置；`--tall` 截整页、`--mobile` 截 390×844）。
+- 材质调试：`LANPIPE_BACKDROP=mica|acrylic|none`、`LANPIPE_TRANSPARENCY=force`。
+- 一条命令打包：`build.bat package`（= `tools/package.ps1`，顺序：前端构建 → MSI → 便携 zip → 打印路径/大小/SHA256）。
+- 打包并生成更新清单：`build.bat package publish`（需先设置 `LANPIPE_RELEASE_URL`，额外调用 `tools/publish-release.ps1` 生成 `latest.json`）。
+- 单独打包：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1 -Bundles msi,portable`（`-SkipFrontend` 跳过前端构建；`-OutDir` 指定输出目录）。
+- 首次打包会自动下载 WiX 到 `%LOCALAPPDATA%\tauri`；cargo 需在 PATH 中（`%USERPROFILE%\.cargo\bin`）。
+- 发布：`tools/publish-release.ps1` 生成 `.sig` 与 `latest.json`，签名密钥由 `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 提供。
 
-- 控制帧上限 `MAX_CONTROL_FRAME = 64 MiB`（DATA 仍限 4 MiB）：几万文件的目录清单（Offer）可达数 MB，之前 4 MiB 上限会让 25GB 级目录直接断连。
-- TCP keepalive：`TcpKeepalive::with_time(30s).with_interval(10s)`，避免长传输被设备/NAT 判定空闲断开。
-- 大清单引发的爆栈：CLI 与 GUI 的发送路径都在独立 64 MiB 栈线程里执行，tokio worker 栈 16 MiB。
-- 接收端不再在 `Accept` 前逐个 `create_dir_all`（几万个目录在慢盘上要几十秒，会耗尽发送端等待）；目录在 Accept 后后台补齐，文件写入时也会创建父目录。
-- 单条连接异常（半帧/对端断开）只结束该连接，不再把整个会话标记失败；缺失文件由 Done 后的 `Verify → Resync` 补齐。
-- DATA 写超时 60s → 180s。
+### 10.4 持续集成
 
-### 断点续传（L1，2026-11-20）
+- `.github/workflows/ci.yml`：push/PR 到 `main`、`dev` 时跑 i18n 检查、前端构建、`cargo test`、`clippy -D warnings` 与 release 构建。
+- `.github/workflows/release.yml`：推送 `v*` tag 时构建 MSI、便携版、签名并生成 `latest.json`，创建 GitHub Release。
 
-- 接收端按「manifest 摘要」在 `<状态目录>/journals/` 维护 JSONL journal，记录已完成文件（id/size/xxh64）与首次接收根目录名。
-- 再次发送同一源目录时，接收端在 `Accept.resume` 返回已完成文件集合，发送端跳过它们；接收根目录复用上次的 `LanPipe-*`，不会重复建目录。
-- 完成文件仍参与最终 `Verify`（跳过的文件用 journal 里的 xxh64 比对）；中断留下的 `.lp-part` 首版直接清理重传，单文件内部偏移续传留给 L2。
-- 状态目录：Windows `%APPDATA%\LanPipe\state`，Linux `$XDG_STATE_HOME/lanpipe`，可用 `LANPIPE_STATE_DIR` 覆盖；设计依据见 [docs/RESUME-RESEARCH.md](docs/RESUME-RESEARCH.md)。
+### 10.5 分支与提交
 
-## UI 设计（M2）
+- 开发在 `dev` 分支进行，稳定版本合入 `main`；发布打标签，如 `v0.1.0-m2`。
+- 提交信息用简洁祈使句说明改动范围与原因；涉及协议、架构或产品方向的改动，先更新 `AGENT.md`，再改代码。
+- 提交前通过 `cargo fmt`、`cargo clippy -- -D warnings`、`cargo test` 与 i18n 校验。
 
-- 设计文档：[`docs/UI-DESIGN.md`](docs/UI-DESIGN.md)（WinUI 3 / Fluent 2，模块化 + i18n XML）
-- 线框草图：`docs/ui/wireframe-send.png`、`wireframe-receive.png`、`wireframe-settings.png`、`wireframe-mobile.png`
-- 断点续传为自动机制：中断后重新发送同一目录即可续传（详见 UI-DESIGN §6、`docs/RESUME-RESEARCH.md`）
-- 短 ID：设备主 IPv4 末段三位数（如 `#005`），用于同子网识别与 IP 直连；完整 UUID 保留为完整 ID（设置页可复制）
-- IP 直连：只输 1–3 位尾号 → 扫描本机所有子网的 `*.NNN:53311`；也可输入完整 `IP[:端口]`
-- 移动端（<640px）：底部 Tab，仅「选择文件 / 选择文件夹」，无拖入
+### 10.6 代码约定
 
-## 前端结构（M2，2026-11-21）
+- 标识符用英文，注释与用户可见文案用中文；程序不包含遥测。
+- 设置项集中在 `apps/desktop/src-tauri/src/settings.rs`，不散落在命令层。
+- 文案统一走 `t()`，资源位于 `public/i18n/zh-CN.xml`；新增 key 后运行 `node tools/check-i18n.mjs`。
+- 生产构建必须启用 `custom-protocol` feature。
 
-- `src/styles/`：`tokens.css`（Fluent 2 设计变量）、`base.css`（骨架与响应式）、`components.css`、`views.css`。
-- `src/ui/`：DOM 构造与 SVG 图标、格式化函数。
-- `src/i18n/`：XML 语言包加载器（`public/i18n/zh-CN.xml`，`t(key, vars)`）。
-- `src/api/tauri.ts`：后端命令/事件封装；`src/state/store.ts`：单一状态与事件折叠。
-- `src/layout/shell.ts`：标题栏 + 左导航 + 状态栏（<640px 底部 Tab）。
-- `src/views/`：`send` / `receive` / `history` / `diagnostics` / `settings` 五页；`src/actions.ts` 业务动作。
+## 11. 许可证
 
-构建：`npm run build`（前端 → `dist/`）后再 `cargo build --release --features custom-protocol -p lanpipe`。
+本项目使用 MIT 许可证，详见 [LICENSE](LICENSE)。
 
-### UI 验收截图
-
-```
-$env:LANPIPE_CDP = "9333"; Start-Process "$env:LOCALAPPDATA\Programs\LanPipe\LanPipe.exe"
-node tools/ui-shot.mjs 9333 docs/shot.png 3 --tall
-```
-
-截图由 WebView2 DevTools 协议直接取页面渲染，不依赖屏幕/前台窗口。
-
-## 诊断与单实例（M1）
-
-- 左导航「诊断」：概览（版本/Build/材质/短 ID/完整 ID/配置与状态目录）、网络（逐块网卡/掩码/短 ID、监听端口、发现、并发流、防火墙、接收目录）、附近设备。
-- 「刷新」重新采集；「复制诊断信息」把整份 JSON 放进剪贴板。
-- 单实例：第二次启动只聚焦已有窗口，不会新开进程；关闭窗口收进托盘。
-
-### 已知问题：WebView2 145/154 透明回归
-
-Windows 11 上如果界面「整窗发灰、只有自绘标题栏透」，先打开 **诊断** 页看：
-
-- `WebView2 版本` 为 `145.x` 或 `154.x` 时，这是微软已知回归（[#5481](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5481)、[#5752](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5752)）：透明窗口会绘制不透明底板，`SetDefaultBackgroundColor(alpha=0)` 被忽略。
-- 程序会自动回退纯色（诊断页「窗口透明」显示「运行时缺陷，已回退纯色」），不再发灰；微软修复后自动恢复 Mica/Acrylic。
-- 调试可用 `LANPIPE_BACKDROP=mica|acrylic|none` 强制材质、`LANPIPE_TRANSPARENCY=force` 强制透明。
-
-### 材质分层约定
-
-- Win10（Acrylic）：页面 80%、Tab 90%、标题栏 90%+压深、卡片 92% —— 保持原方案。
-- Win11（Mica）：页面直接透出 Mica，Tab/标题栏/状态栏叠纯白 alpha，卡片用 `CardBackgroundFillColorDefault` + `CardStrokeDefault`（Fluent 官方取值）。不要把页面色按 alpha 叠到 Mica 上，会发灰。
-- 应用主题与系统主题不一致时自动退回纯色（材质按系统主题取色，无法跟随应用主题）。
-
-## 安装包（M3）
-
-| 产物 | 说明 | 构建 |
-|---|---|---|
-| `LanPipe_<ver>_x64_zh-CN.msi` | 中文安装包（装到 `C:\Program Files\LanPipe`，带卸载入口与开始菜单） | `cd apps/desktop/src-tauri && npx tauri build --bundles msi` |
-| `LanPipe_<ver>_x64-portable.zip` | 便携版（解压即用，含说明与 LICENSE） | `pwsh tools/make-portable.ps1` |
-| `target/release/lanpipe.exe` | 开发/调试用单文件 | `cargo build --release --features custom-protocol -p lanpipe` |
-
-说明：
-
-- 打安装包前必须先把前端构建出来（`npm run build`），否则内嵌的是旧页面；`tauri build` 会自己跑 release 编译。
-- `npx tauri build` 需要 `cargo` 在 PATH 上（本机为 `%USERPROFILE%\.cargo\bin`）。
-- 首次打包会下载 WiX/NSIS 工具到 `%LOCALAPPDATA%\tauri`；若 GitHub 直连超时，可先用代理下载 `wix314-binaries.zip` / `nsis-3.13.zip` 解压到该目录。
-- NSIS（per-user）目标已配置但当前暂不作为交付：本机静默安装（`/S`）返回 0 却不落盘，待查；MSI 已验证安装/卸载/运行正常。
-
-### 自动更新（M3，骨架）
-
-- 插件：`tauri-plugin-updater`（Rust）+ 前端「设置 → 关于 → 检查更新」。
-- 配置在 `apps/desktop/src-tauri/tauri.conf.json` 的 `plugins.updater`：`pubkey`、`endpoints`、`windows.installMode = "passive"`（安装时只显示进度条）。
-- 当前 `endpoints` 占位为 `https://example.invalid/lanpipe/latest.json`，所以点「检查更新」会走到失败分支并提示；换成真实地址后即可工作。
-- 开发密钥：`.keys/lanpipe-updater.key`（口令 `lanpipe-dev-key`）与 `.keys/lanpipe-updater.key.pub`；**正式发布必须换新密钥，且私钥只放 CI secret**（`TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`）。
-- 发布清单：`pwsh tools/publish-release.ps1 -Installer <msi> -Version 0.1.1 -Url <下载地址> -Notes "..."` 会调用 `tauri signer sign` 生成 `.sig`，并写出 `latest.json`（`version/notes/pub_date/platforms.windows-x86_64.{signature,url}`）。
-- 端到端顺序：改版本号（`tauri.conf.json` 与 workspace `Cargo.toml`）→ `npm run build` → `tauri build --bundles msi` → `publish-release.ps1` → 上传 MSI + `latest.json` 到 `endpoints` 指向的目录。
+Copyright (c) 2026 LanPipe

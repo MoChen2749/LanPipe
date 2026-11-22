@@ -18,7 +18,7 @@
 
 | 事实 | 数据/证据 | 对产品的约束 |
 |---|---|---|
-| 归档再解包 = 2x 磁盘 | 370.8 MiB 目录暂存峰值 732–747 MiB；sendme 源码级 `ExportMode::Copy` 2x | **禁止**任何 zip/tar staging；接收端只允许每文件 `.part` |
+| 归档再解包 = 2x 磁盘 | 本机实测：370.8 MiB 目录做暂存归档时峰值 732–747 MiB | **禁止**任何 zip/tar staging；接收端只允许每文件 `.part` |
 | 单流建文件上限 ≈600–700 文件/s | 本机 tar 管道 3202 文件 5.08s | **必须多流**（4–8 条）才能跑满 |
 | 多流可到 2,000–2,700 文件/s | 4 流 1.95k、8 流 2.2–2.7k 文件/s | 默认 4 条，可配 1–8 |
 | 1GbE ≈ 90–120 MiB/s；HDD ≈ 125 MiB/s | 本机 RAW 写 125.6 MiB/s | 性能验收以 1GbE 跑满为准，2.5G 视接收盘 |
@@ -37,11 +37,11 @@
 
 **非目标（v1 不做）**
 - 公网穿透 / 中继服务器 / 账号体系 / 云同步
-- 与 Syncthing 式的持续双向同步
+- 与持续双向同步工具不同，只做一次性传输，不做文件夹镜像
 - 以系统共享或外部命令行进程作为传输实现（传输只走本项目协议）
 - 桌面三端优先：Windows / macOS / Linux（Tauri v2 同一套前端，按平台做适配）
 - 移动端（Android/iOS）放到 M3 之后评估，不作为近期目标
-- **不做 LocalSend 协议兼容**（2026-11-20 明确决定，至少当前阶段不做；握手/端口/清单都不向 LocalSend 对齐）
+- **只实现自有 LP/1 协议**，不对齐、不兼容任何第三方传输协议（握手、端口、清单格式均自定义）
 
 ## 4. 技术选型（已定，改动需先改本节）
 
@@ -118,34 +118,29 @@
 - `apps/desktop/src-tauri`：Tauri 命令、事件、配置读写、UI 胶水
 - `apps/desktop/src`：前端（含设置页）
 
-## 6. 协议 LP/1（v1 草案，实现以 `docs/protocol.md` 为准）
+## 6. 协议 LP/1（v1）
 
-**发现**：UDP 多播 + 受限广播，每 2s 一次
-`{"t":"announce","v":1,"id":"<uuid>","name":"DESKTOP-X","os":"windows","port":53311,"cap":["lp/1"]}`；退出时 `{"t":"bye","id":...}`。
-UI 以 5s 无心跳判离线。**手动 IP 直连**作为兜底（不经发现，直接 `HELLO`）。
+> 完整字段、时序图与兼容性说明见 [`docs/PROTOCOL-LP1.md`](docs/PROTOCOL-LP1.md)。以下为速查；与代码冲突时以代码和该文档为准。
 
-**控制面**：TCP 53311，`u32 LE 长度 + JSON`。
-`HELLO → ACCEPT{token} → MANIFEST → RESUMED{skip[]} → DATA… → FILE_DONE → DONE`
+**发现**：UDP `53310`，多播 `239.255.42.99` + 受限广播，每 2 s 一次 `Announce{id,name,port,short_id?}`（无 `os/cap/bye` 字段）；5 s 无公告判离线。手动 IP 直连可绕过发现。
 
-**数据帧**（LP/1）：
-```
-magic "LPK1"(4) | type u8 | flags u8 | stream u16 | len u32 | payload
-DATA payload: pathId u32 | offset u64 | crc32c u32 | bytes
-```
-- DATA 块 1–4 MiB；小文件可合帧（≤4 MiB 或 ≤64 个文件）减少 syscall
-- 接收端按 `pathId` 找 manifest 条目，**直接写目标路径 + `.lp-part`**
+**连接模型**：TCP `53311`。首帧 `Hello` 建立控制连接，随后 `Offer`（完整清单，控制帧上限 64 MiB）→ `Accept`（可选 `resume{completed,partial}`）→ 数据流 `DATA`/`FileDone` → `Done` → `Verify` → 必要时 `Resync` → `Complete`；错误用 `Reject`/`Error`。
 
-**manifest**：`{root, total, files:[{id, path, size, mtime, mode, xxh64?}]}`；`treeHash` 用于识别目录变化
-**落盘**：`target/<path>.lp-part` → 校验 → `fsync` → `rename`；目录按需建；保留 mtime
-**续传**：文件级——`size + mtime + xxh64` 一致则 skip；会话断后重连重新 MANIFEST
-**校验**：帧 CRC32C；文件 xxh64（默认 <64 MiB 开启，大文件可配）
-**压缩**：默认关；per-file flag，仅 <1 MiB 且熵低的文件用 zstd-1
-**安全**：M0 明文 + 接收端显式确认；M1 换 rustls 自签证书 + 指纹 TOFU（局域网工具的常见做法）
-**并行**：默认 4 条流（可 1–8）；大文件独占流，小文件 round-robin
+**帧格式**：12 字节大端帧头 `magic "LPK1"(4) | type u8 | flags u8 | stream u16 | len u32`，payload 为 JSON（控制帧）或 `id u32 | offset u64 | 原始数据`（DATA）。`MAX_CONTROL_FRAME = 64 MiB`、`MAX_DATA_FRAME = 4 MiB`、`DATA_CHUNK = 512 KiB`；**无 CRC**（完整性靠逐文件 xxh64）。
+
+**落盘**：`<下载根>/<root_name>/<相对路径>.lp-part` → flush/fsync → `rename`；目录在 Accept 后后台创建；`root_name` 做单层校验（拒绝绝对路径与 `..`）。
+
+**续传**：`manifest_digest = xxh64(排序后的 path\0size\0mtime\0is_dir\n)`；接收端 journal `journals/<dest_key>-<digest>.jsonl` 记录 `{id,size,xxh64}` 与头部 `{"root": "<name>"}`，重发同一清单时跳过已完成文件；单文件内部偏移（`ResumeState.partial`）当前未启用。
+
+**校验与重传**：接收端 `Done` 后回报全部文件哈希，发送端比对后只重传缺失/不一致文件（最多 3 轮）；失败文件记录在 `Resync{ids}`。
+
+**超时与并发**：1–8 条数据连接（桌面默认 4），文件级并行、单文件不跨流；Accept 等待与 DATA 写超时均为 **900 s**；TCP keepalive 30 s / 10 s；单连接异常只终止该连接，不影响整个会话。
+
+**安全**：明文无认证、无加密，仅限可信局域网；TLS/TOFU 属后续计划。
 
 ### 6.1 发现可靠性
 
-LocalSend 用 53317 多播发现，已知失败原因：AP 隔离（客户端隔离）、防火墙拦入站、多网卡/VPN 绑定错误、多播被禁、子网不同、休眠、端口占用等（参考 [LocalSend Network & Discovery Problems](https://deepwiki.com/localsend/localsend/8.1-network-and-discovery-problems)）。LanPipe 采取**四层兜底**：
+多播发现的常见失败原因：AP 隔离（客户端隔离）、防火墙拦入站、多网卡/VPN 绑定错误、多播被禁、子网不同、休眠、端口占用等。LanPipe 采取**四层兜底**：
 
 1. **双通道广播**：每块活动网卡上同时发 **UDP 多播**（`239.255.42.99:53310`）与**受限广播**（`255.255.255.255:53310`），2s 一次；**接收端也主动 announce**（双向），解决单侧被过滤。
 2. **主动单播扫描**：对本机路由表每个 /24 段发探测（限速、可关），覆盖"广播/多播被禁但单播可达"的网络。
@@ -280,7 +275,7 @@ lanpipe/
 2. GUI 范围：WinUI 3 / Fluent 2 视觉 + 组件化 + i18n XML + 桌面三端与窄屏/移动端预留（已落地，见 §16）。
 3. 托盘 / 开机自启：**要**，已实现（关闭窗口收进托盘；HKCU Run 自启）。
 4. 重置设备 ID：只换 UUID，保留 `recentPeers` 与历史（对端需要重新识别本机）。
-5. 不做 LocalSend 协议兼容（2026-11-20 决定，长期有效）。
+5. 只实现自有 LP/1 协议，不兼容第三方传输协议（长期有效）。
 
 ## 14. M0 实现记录（2026-11-19）
 
@@ -289,7 +284,7 @@ lanpipe/
 **关键决定（与初版设计不同，需记住）**：
 
 1. **接收端并发模型**：不用全局 `Mutex<Session>` 包住写入（会把 IO 串行化）。改为 `Arc<Session>` + `files_done/bytes_done: AtomicU64` + `open: StdMutex<HashMap<u32, Arc<Mutex<PartState>>>>`，每个文件独立锁。实测 903 文件 3.81s → 1.42s（2.7×）。
-2. **不逐文件 `sync_all`**：只 flush + 原子 rename，与 tar/robocopy 基线口径一致。牺牲"单文件立即持久化"，换吞吐；掉电一致性由 M1 的 checkpoint/续传机制承担。
+2. **不逐文件 `sync_all`**：只 flush + 原子 rename。牺牲"单文件立即持久化"，换吞吐；掉电一致性由 checkpoint/续传机制承担。
 3. **逐文件 `FileReceived` 事件不转发到前端**：万级文件时每次 IPC+JSON 序列化会显著拖慢；只发节流后的 `ReceiveProgress/SendProgress`（8 MiB 或 200ms）与最终 `Received/Sent`。
 4. **CLI 与 GUI 日志分离**：`%TEMP%\LanPipe\cli-send.log` vs `lanpipe.log`，避免 CLI 截断 GUI 日志。
 5. **发送端 30s 等 Accept、Done 后接收端最多等 5s 追平**，不完整则 `Failed`。
@@ -325,7 +320,7 @@ lanpipe/
 
 ### 15.1 决策
 
-- **不做 LocalSend 协议兼容**：握手、端口（53310/53311）、清单格式全部保持 LP/1 自有协议；未来若做互操作，另立独立模块，不污染主协议。
+- **不兼容第三方协议**：握手、端口（53310/53311）、清单格式全部保持 LP/1 自有协议；未来若做互操作，另立独立模块，不污染主协议。
 - **视觉基线**：Fluent Design / WinUI 3（颜色、圆角、层级、字体、动效），在 Windows 上贴近系统原生观感；macOS/Linux 沿用同一套 token，仅做字体/间距/快捷键的平台微调。
 - **技术**：Tauri v2 + TypeScript/Vite，前端不引重框架（保持单 exe 小体积、启动快）；以「设计 token + 组件函数 + 页面模块」组织，后续可平滑替换为任意框架。
 
@@ -475,7 +470,7 @@ node tools/ui-eval.mjs 9333 "@expr.js"   # 在页面内执行表达式
 
 ### 16.7.1 参考来源
 
-- **图吧工具箱 CE**（[luolangaga/tubatools](https://github.com/luolangaga/tubatools)，WinUI 3 社区版）：入场动画编排（淡入 400ms + 上移 500ms，子区块 80–100ms 依次入场，卡片 scale 0.94→1）、`BackdropService`（Mica/MicaAlt/Acrylic/AcrylicThin 控制器 + Tint/Luminosity/Fallback + 跟随主题与窗口激活状态）、SelectorBar 样式（画刷过渡 83ms）。
+- **WinUI 3 应用通用做法**：入场动画编排（淡入 400ms + 上移 500ms，子区块 80–100ms 依次入场，卡片 scale 0.94→1）；系统材质用 Mica/MicaAlt/Acrylic/AcrylicThin 控制器，支持 Tint/Luminosity/Fallback 并跟随主题与窗口激活状态；选择条类控件用 83ms 画刷过渡。
 - **微软文档**：[Mica material](https://learn.microsoft.com/en-us/windows/apps/design/style/mica)、[Acrylic material](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic)、[Page transitions](https://learn.microsoft.com/en-us/windows/apps/develop/motion/page-transitions)。
 - **官方 Fluent 2 token**：`@fluentui/tokens`（构建期生成 CSS 变量，见 §16.6）。
 
@@ -673,6 +668,8 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 - Fluent 颜色 token 与取值（LayerFillDefault `#80FFFFFF`/`#4D3A3A3A`、CardBackgroundFillDefault `#B2FFFFFF`/`#0DFFFFFF`、CardStrokeDefault `#0F000000`/`#1A000000`）：<https://learn.microsoft.com/visualstudio/extensibility/ux-guidelines/theme-color-token-reference>
 
 ### 16.11 M3 打包与分发（2026-11-22）
+
+**打包入口**：`build.bat package` / `build.bat package publish`，内部调用 `tools/package.ps1`（前端构建 → MSI → 便携 zip → 汇总路径/大小/SHA256；`-Publish -Url` 时再生成 `latest.json`）。单独使用：`powershell -File tools/package.ps1 -Bundles msi,portable [-SkipFrontend] [-OutDir <dir>]`。
 
 - **MSI（主交付）**：`bundle.targets = ["msi"]`、`bundle.windows.wix.language = ["zh-CN"]`，产物 `target/release/bundle/msi/LanPipe_0.1.0_x64_zh-CN.msi`（约 2.9 MB）。
   - 安装位置 `C:\Program Files\LanPipe`（perMachine，需要管理员），带卸载快捷方式与「应用和功能」条目；

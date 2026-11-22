@@ -1,5 +1,5 @@
-@echo off
-chcp 437 >nul
+﻿@echo off
+chcp 65001 >nul
 setlocal EnableExtensions
 title LanPipe Build Tool
 pushd "%~dp0"
@@ -10,6 +10,8 @@ set "RUSTUP=%USERPROFILE%\.cargo\bin\rustup.exe"
 set "INSTALL_DIR=%LOCALAPPDATA%\Programs\LanPipe"
 if not exist "%CARGO%" set "CARGO=cargo"
 if not exist "%RUSTUP%" set "RUSTUP=rustup"
+set "PS_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
+if not exist "%PS_EXE%" set "PS_EXE=powershell"
 
 if /i "%~1"=="build" goto build
 if /i "%~1"=="clean" goto clean
@@ -17,6 +19,8 @@ if /i "%~1"=="run" goto run
 if /i "%~1"=="dev" goto dev
 if /i "%~1"=="check" goto check
 if /i "%~1"=="cross" goto cross
+if /i "%~1"=="package" goto package
+if /i "%~1"=="test" goto test
 
 
 :menu
@@ -33,7 +37,11 @@ echo   3. Run Release build (auto-deploy to LOCALAPPDATA\Programs\LanPipe)
 echo   4. Run in dev mode (Vite + cargo run)
 echo   5. Cross-compile (Windows ARM64 / Linux WSL / macOS notes)
 echo   6. Environment check
+echo   7. 打包：MSI 安装包 + 便携版 zip（package）
+echo   8. 测试：cargo test + clippy（test）
 echo   0. Exit
+echo.
+echo   用法：build.bat package [publish]   build.bat test
 echo.
 set "pick="
 set /p "pick=Select a number and press Enter: "
@@ -44,6 +52,8 @@ if "%pick%"=="3" goto run
 if "%pick%"=="4" goto dev
 if "%pick%"=="5" goto cross
 if "%pick%"=="6" goto check
+if "%pick%"=="7" ( set "MENU_CALL=1" & goto package )
+if "%pick%"=="8" ( set "MENU_CALL=1" & goto test )
 if "%pick%"=="0" goto end
 goto menu
 
@@ -195,6 +205,115 @@ reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A
 echo.
 call :pause_if
 goto menu
+
+rem ============================================================
+rem  package：一条命令产出 MSI + 便携版 zip（调用 tools\package.ps1）
+rem  package publish：额外生成 latest.json（需要 LANPIPE_RELEASE_URL）
+rem ============================================================
+:package
+if /i "%~2"=="publish" goto package_publish
+cls
+echo ===== 打包：MSI 安装包 + 便携版 zip =====
+echo.
+if not exist "%ROOT%\tools\package.ps1" (
+  echo [错误] 缺少 tools\package.ps1，无法打包。
+  set "PKG_RC=1"
+  goto package_done
+)
+echo 调用 tools\package.ps1（MSI 由 Tauri 构建，便携版由 tools\make-portable.ps1 构建）
+echo.
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\tools\package.ps1" -Bundles msi,portable
+set "PKG_RC=%ERRORLEVEL%"
+goto package_done
+
+:package_publish
+cls
+echo ===== 打包并发布：MSI + 便携版 zip + latest.json =====
+echo.
+if not exist "%ROOT%\tools\package.ps1" (
+  echo [错误] 缺少 tools\package.ps1，无法打包。
+  set "PKG_RC=1"
+  goto package_done
+)
+if not exist "%ROOT%\tools\publish-release.ps1" (
+  echo [错误] 缺少 tools\publish-release.ps1，无法生成 latest.json。
+  set "PKG_RC=1"
+  goto package_done
+)
+if not defined LANPIPE_RELEASE_URL (
+  echo [错误] 未设置环境变量 LANPIPE_RELEASE_URL。
+  echo        它应指向 MSI 的公网下载地址，例如：
+  echo          set "LANPIPE_RELEASE_URL=https://example.com/lanpipe/LanPipe_0.1.0_x64_zh-CN.msi"
+  echo        设置后重新运行：build.bat package publish
+  set "PKG_RC=1"
+  goto package_done
+)
+echo 下载地址取自环境变量 LANPIPE_RELEASE_URL（此处不打印，避免其中的特殊字符破坏输出）
+echo.
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\tools\package.ps1" -Bundles msi,portable -Publish -Url "%LANPIPE_RELEASE_URL%"
+set "PKG_RC=%ERRORLEVEL%"
+goto package_done
+
+:package_done
+echo.
+if not "%PKG_RC%"=="0" (
+  echo [失败] 打包未完成，退出码 %PKG_RC%，详见上方日志。
+) else (
+  echo [完成] 打包成功，产物见上方汇总（路径 / 大小 / SHA256）。
+)
+if defined MENU_CALL (
+  set "MENU_CALL="
+  call :pause_if
+  goto menu
+)
+popd
+endlocal & exit /b %PKG_RC%
+
+rem ============================================================
+rem  test：cargo test + clippy -D warnings（代码门禁）
+rem ============================================================
+:test
+cls
+echo ===== 测试：cargo test + clippy =====
+echo.
+"%CARGO%" --version >nul 2>nul
+if errorlevel 1 (
+  echo [错误] 未找到 cargo。请先安装 Rust 工具链：https://win.rustup.rs
+  echo        或把 %USERPROFILE%\.cargo\bin 加入 PATH 后重试。
+  set "TEST_RC=1"
+  goto test_done
+)
+echo [1/2] cargo test --workspace
+echo.
+"%CARGO%" test --workspace
+if errorlevel 1 (
+  set "TEST_RC=1"
+  goto test_done
+)
+echo.
+echo [2/2] cargo clippy --workspace -- -D warnings
+echo.
+"%CARGO%" clippy --workspace -- -D warnings
+if errorlevel 1 (
+  set "TEST_RC=1"
+  goto test_done
+)
+set "TEST_RC=0"
+
+:test_done
+echo.
+if not "%TEST_RC%"=="0" (
+  echo [失败] cargo test 或 clippy 未通过，退出码 %TEST_RC%，详见上方日志。
+) else (
+  echo [完成] cargo test 与 clippy 全部通过。
+)
+if defined MENU_CALL (
+  set "MENU_CALL="
+  call :pause_if
+  goto menu
+)
+popd
+endlocal & exit /b %TEST_RC%
 
 :collect
 taskkill /IM LanPipe.exe /F >nul 2>nul

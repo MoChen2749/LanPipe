@@ -3,32 +3,47 @@
 /dist-bin/
 /target/
 /apps/desktop/src-tauri/target/
+/target-linux/
 /apps/desktop/src-tauri/gen/
 
-# Node
+# 依赖
 node_modules/
 npm-debug.log*
 pnpm-debug.log*
+yarn-error.log*
 
 # Rust
 **/*.rs.bk
+*.pdb
 
-__pycache__/
+# 安装包 / 签名 / 更新清单（由 CI 或 tools/package.ps1 生成）
+*.msi
+*.msi.sig
+latest.json
+
+# 密钥（绝不入库）
+/.keys/
+
+# 本地配置 / 临时数据
+*.local.json
+/.wv2/
+*.log
+build-*.log
+target/installer-test/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
 
 # 系统
 .DS_Store
 Thumbs.db
 
-# 本地配置 / 临时数据
-*.local.json
-/target-*
+# Python（图标/线框工具）
+__pycache__/
+*.pyc
 
-# WebView2 临时数据
-/.wv2/
-*.pdb
-
-# ������־
-build-*.log
-target/installer-test/
-
-.keys/
+# 文档调试图（保留 docs/screenshots、docs/ui）
+docs/_*.png
+docs/tmp/

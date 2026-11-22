@@ -388,6 +388,35 @@ fn part_path_for(final_path: &Path) -> PathBuf {
 }
 
 /// 校验清单路径：拒绝绝对路径与 `..`。
+/// 只接受单层目录名（不能是绝对路径、`..`、多级路径），否则返回 None。
+fn safe_root_name(raw: &str) -> Option<String> {
+    let path = safe_rel(raw)?;
+    let mut components = path.components();
+    let first = components.next()?;
+    if components.next().is_some() {
+        return None;
+    }
+    match first {
+        Component::Normal(name) => {
+            let value = name.to_string_lossy().to_string();
+            if value.trim().is_empty() {
+                None
+            } else {
+                Some(value)
+            }
+        }
+        _ => None,
+    }
+}
+
+fn new_root_name() -> String {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("LanPipe-{stamp}")
+}
+
 fn safe_rel(path: &str) -> Option<PathBuf> {
     if path.is_empty() {
         return None;
@@ -514,10 +543,13 @@ async fn handle_conn(
             } else {
                 journal::load(&state_root, &dest_root, &digest)
             };
+            // root_name 也必须做单层校验：恶意发送端可用 `..` 或绝对路径把文件写到下载根之外。
             let root_name = journal_data
                 .root_name
-                .clone()
-                .unwrap_or_else(|| offer.root_name.clone());
+                .as_deref()
+                .and_then(safe_root_name)
+                .or_else(|| safe_root_name(&offer.root_name))
+                .unwrap_or_else(new_root_name);
             let root = dest_root.join(&root_name);
             let mut rel_paths = HashMap::new();
             let mut sizes = HashMap::new();
@@ -1210,4 +1242,27 @@ fn spawn_data_streams(
         }));
     }
     tasks
+}
+
+#[cfg(test)]
+mod root_name_tests {
+    use super::{new_root_name, safe_root_name};
+
+    #[test]
+    fn rejects_traversal_and_absolute_names() {
+        assert_eq!(safe_root_name("LanPipe-123"), Some("LanPipe-123".to_string()));
+        assert_eq!(safe_root_name("sub/dir"), None);
+        assert_eq!(safe_root_name(".."), None);
+        assert_eq!(safe_root_name("../escape"), None);
+        assert_eq!(safe_root_name("C:\\Windows"), None);
+        assert_eq!(safe_root_name(""), None);
+        assert_eq!(safe_root_name("   "), None);
+    }
+
+    #[test]
+    fn fallback_name_is_single_component() {
+        let name = new_root_name();
+        assert!(name.starts_with("LanPipe-"));
+        assert_eq!(safe_root_name(&name), Some(name));
+    }
 }
