@@ -270,6 +270,9 @@ build.bat test              # 代码门禁：cargo test + clippy
 node tools/check-i18n.mjs   # 校验 i18n key 使用情况
 ```
 
+
+Windows 上若 `cargo test` 报 MSVC `D8050`（编译 ring 时无法写入调试记录），先设置 `$env:CARGO_PROFILE_DEV_DEBUG=0` 再跑测试；CI 已默认设置该变量。
+
 前端必须先构建：`frontendDist` 指向 `dist/`，直接执行 cargo 构建会得到旧的或缺失的前端产物。
 
 ### 10.3 调试与本地验收

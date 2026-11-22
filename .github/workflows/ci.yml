@@ -41,9 +41,15 @@ jobs:
         run: npm run build
 
       - name: cargo test
+        # 关闭 dev profile 调试信息：部分环境（含本地 MSVC 14.44）在带 /Z7 调试记录时
+        # 编译 ring 会报 D8050（命令行无法写入调试记录），关掉即可稳定通过。
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
         run: cargo test --workspace --all-targets
 
       - name: clippy
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: 构建 release（Windows 桌面）

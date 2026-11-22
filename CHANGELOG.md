@@ -11,6 +11,10 @@
 - 打包集成：`build.bat package` / `tools/package.ps1` 一条命令产出安装包。
 - 协议文档 `docs/PROTOCOL-LP1.md`、多端部署文档 `docs/INSTALL.md`。
 
+### 修复
+
+- 修复接收端 `Offer.root_name` 未校验导致的路径穿越风险（仅接受单层目录名）。
+
 ## [0.1.0] - 2026-11-22
 
 ### 新增

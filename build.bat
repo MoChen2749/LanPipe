@@ -283,6 +283,7 @@ if errorlevel 1 (
   set "TEST_RC=1"
   goto test_done
 )
+set "CARGO_PROFILE_DEV_DEBUG=0"
 echo [1/2] cargo test --workspace
 echo.
 "%CARGO%" test --workspace
@@ -293,7 +294,7 @@ if errorlevel 1 (
 echo.
 echo [2/2] cargo clippy --workspace -- -D warnings
 echo.
-"%CARGO%" clippy --workspace -- -D warnings
+"%CARGO%" clippy --workspace --all-targets -- -D warnings
 if errorlevel 1 (
   set "TEST_RC=1"
   goto test_done
