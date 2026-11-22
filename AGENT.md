@@ -132,7 +132,7 @@
 
 **续传**：`manifest_digest = xxh64(排序后的 path\0size\0mtime\0is_dir\n)`；接收端 journal `journals/<dest_key>-<digest>.jsonl` 记录 `{id,size,xxh64}` 与头部 `{"root": "<name>"}`，重发同一清单时跳过已完成文件；journal 默认保留 30 天并在接收会话开始时后台清理过期项（`journal::prune`）；单文件内部偏移（`ResumeState.partial`）当前未启用。
 
-**校验与重传**：接收端 `Done` 后回报全部文件哈希，发送端比对后只重传缺失/不一致文件（最多 3 轮）；失败文件记录在 `Resync{ids}`。
+**校验与重传**：接收端 `Done` 后**先等所有数据连接的 DATA/FileDone 处理完**再回报全部文件哈希，发送端比对后只重传缺失/不一致文件（最多 3 轮）；失败文件记录在 `Resync{ids}`。若过早发清单，会与在途帧并发重传同一文件（见 §14.5）。
 
 **超时与并发**：1–8 条数据连接（桌面默认 4），文件级并行、单文件不跨流；Accept 等待与 DATA 写超时均为 **900 s**；TCP keepalive 30 s / 10 s；单连接异常只终止该连接，不影响整个会话。
 
@@ -372,7 +372,15 @@ lanpipe/
 - 接收端：按摘要查 journal；只信任「目标文件存在且大小一致」的记录；复用 journal 头部记录的接收根名；未完成文件的 `.lp-part` 清理重传；启动接收会话时后台清理过期 journal（30 天）。
 - 发送端：跳过 completed，进度以已完成字节/文件数初始化；Verify 时对已完成文件用接收端 journal 的 xxh64 比对。
 - 测试：`journal` 单测 + `tests/resume.rs`（中途掐断接收端→重启→续传，断言单根、文件树一致、进度从已完成数起步、journal 存在）。
-- 待办（L2）：`FileOffset` 单文件偏移续传、块级 bitmap、状态目录 TTL 清理。
+- 待办（L2）：`FileOffset` 单文件偏移续传、块级 bitmap。
+
+### 14.5 小文件校验竞态修复（2026-11-23）
+
+- 现象：10,000 个 1 KiB 小文件传输时（环回、4 流），发送端进度超过总数（17,260/10,000）、接收端进度回退，接收端报 `rename 失败 … 拒绝访问 (os error 5)` / `找不到指定的文件 (os error 2)`，最终 `远程主机强迫关闭了一个现有的连接 (os error 10054)`，目录里残留 786 个 `.lp-part` 与部分重复落盘。
+- 根因：`Done` 走**新的独立连接**，而数据连接上的 `DATA`/`FileDone` 可能仍在接收端队列里。接收端原先只等 1 s（20×50 ms）就发 `Verify`，清单缺少尚未处理完的文件；发送端据此判定缺失并 `Resync` 重传，重传数据与仍在队列里的旧帧并发写同一文件 → 偏移冲突、rename 竞争、连接被重置。
+- 修复：`crates/lanpipe-net/src/transfer.rs` 的 `Done` 分支改为**等所有文件落地**再出校验清单（`files_done < total_files` 时每 20 ms 轮询，最长 120 s 兜底）。发送端只在全部数据流成功后才发 `Done`，因此该等待不会引入死锁。
+- 回归测试：`crates/lanpipe-net/tests/e2e.rs` 新增 `e2e_many_small_files_no_verify_race`（40 目录 × 150 个 128 B 文件，4 流；断言 `Received` 文件数/字节数、文件树一致、无 `.lp-part`）。用旧代码跑该测试会超时失败，修复后约 25 s 通过。
+- 修复后本机环回实测（CLI 进程对进程、4 流）：2,000 × 1 KiB 用时 5.8 s（343 文件/s）；10,000 × 1 KiB 用时 14.8 s（676 文件/s），`.lp-part` 残留 0，接收端 `RECEIVED files=10000`。
 
 ## 16. M2 UI 设计（2026-11-20）
 

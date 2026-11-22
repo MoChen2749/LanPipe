@@ -736,13 +736,17 @@ async fn handle_conn(
                 let mut round = 0u32;
                 loop {
                     round += 1;
-                    // 只等 1s：跨连接的 FileDone 可能比 Done 晚到，等不到也没关系，
-                    // 校验清单会让发送端发现缺失/不符的文件并按文件重传。
-                    for _ in 0..20 {
-                        if session.files_done.load(Ordering::Relaxed) == session.total_files {
-                            break;
-                        }
-                        time::sleep(Duration::from_millis(50)).await;
+                    // Done 走独立连接，数据连接上的 DATA/FileDone 可能还没处理完。
+                    // 必须等所有文件落地再出校验清单：否则发送端会把「尚未处理完」的
+                    // 文件当成缺失并重传，与仍在队列里的旧帧并发写同一个文件，
+                    // 在 Windows 上表现为 rename 拒绝访问 / 找不到文件。
+                    // 发送端只在所有数据流成功后才会发 Done，因此这里等待是安全的；
+                    // 超时仅用于兜底异常（例如 FileDone 丢失），超时后照常出清单。
+                    let wait_deadline = Instant::now() + Duration::from_secs(120);
+                    while session.files_done.load(Ordering::Relaxed) < session.total_files
+                        && Instant::now() < wait_deadline
+                    {
+                        time::sleep(Duration::from_millis(20)).await;
                     }
                     let digest = session.verify_digest();
                     let payload = serde_json::to_vec(&digest).unwrap_or_default();
