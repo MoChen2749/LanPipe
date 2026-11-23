@@ -381,6 +381,8 @@ lanpipe/
 - 修复：`crates/lanpipe-net/src/transfer.rs` 的 `Done` 分支改为**等所有文件落地**再出校验清单（`files_done < total_files` 时每 20 ms 轮询，最长 120 s 兜底）。发送端只在全部数据流成功后才发 `Done`，因此该等待不会引入死锁。
 - 回归测试：`crates/lanpipe-net/tests/e2e.rs` 新增 `e2e_many_small_files_no_verify_race`（40 目录 × 150 个 128 B 文件，4 流；断言 `Received` 文件数/字节数、文件树一致、无 `.lp-part`）。用旧代码跑该测试会超时失败，修复后约 25 s 通过。
 - 修复后本机环回实测（CLI 进程对进程、4 流）：2,000 × 1 KiB 用时 5.8 s（343 文件/s）；10,000 × 1 KiB 用时 14.8 s（676 文件/s），`.lp-part` 残留 0，接收端 `RECEIVED files=10000`。
+- 桌面端复测（CLI 发送 → GUI 接收，经 LAN IP）：2,000 × 1 KiB 用时 3.5 s（≈571 文件/s），接收目录文件数 2,001（含单文件用例）、`.lp-part` 0。
+- 本机测试注意：WSL2 的 localhost 转发（`C:\Program Files\WSL\wslrelay.exe`）会占用 `127.0.0.1:53311`；桌面端绑定 `0.0.0.0:53311` 时，发往 `127.0.0.1` 的连接会被转发进 WSL 里的旧接收端，表现为「发送端显示成功但 Windows 下载目录为空」。测 GUI 接收端要用本机 LAN IP（如 `192.168.100.5:53311`）。
 
 ## 16. M2 UI 设计（2026-11-20）
 
