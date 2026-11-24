@@ -1,12 +1,12 @@
 # 贡献指南
 
-LanPipe 使用 `main` / `dev` 双分支模型。所有改动先进入 `dev`，验证通过后再合并到 `main`。
+LanPipe 使用 `master` / `dev` 双分支模型。所有改动先进入 `dev`，验证通过后再合并到 `master`。
 
 ## 分支模型
 
 | 分支 | 用途 | 规则 |
 |---|---|---|
-| `main` | 稳定发布分支 | 只接受来自 `dev` 的合并；每次合并打 tag（`v0.1.1`）并触发 Release |
+| `master` | 稳定发布分支 | 只接受来自 `dev` 的合并；每次合并打 tag（`v0.1.1`）并触发 Release |
 | `dev` | 日常集成分支 | 功能与修复先合到这里；CI 必须全绿 |
 | `feat/<name>` `fix/<name>` | 短生命周期分支 | 从 `dev` 切出，完成后 PR 回 `dev` |
 
@@ -61,8 +61,8 @@ cargo clippy --workspace --all-targets -- -D warnings
 npm run build; cargo test --workspace; cargo clippy --workspace --all-targets -- -D warnings
 # 3. 打包（CI 也会做）
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1
-# 4. 合并到 main 并打 tag
-git checkout main; git merge --no-ff dev; git tag -a v0.1.1 -m "LanPipe 0.1.1"; git push origin main --tags
+# 4. 合并到 master 并打 tag
+git checkout master; git merge --no-ff dev; git tag -a v0.1.1 -m "LanPipe 0.1.1"; git push origin master --tags
 ```
 
 Release 工作流会构建 MSI、便携版、签名并生成 `latest.json`，上传到 GitHub Release。

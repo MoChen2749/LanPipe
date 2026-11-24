@@ -290,12 +290,12 @@ Windows 上若 `cargo test` 报 MSVC `D8050`（编译 ring 时无法写入调试
 
 ### 10.4 持续集成
 
-- `.github/workflows/ci.yml`：push/PR 到 `main`、`dev` 时跑 i18n 检查、前端构建、`cargo test`、`clippy -D warnings` 与 release 构建。
+- `.github/workflows/ci.yml`：push/PR 到 `master`、`dev` 时跑 i18n 检查、前端构建、`cargo test`、`clippy -D warnings` 与 release 构建。
 - `.github/workflows/release.yml`：推送 `v*` tag 时构建 MSI、便携版、签名并生成 `latest.json`，创建 GitHub Release。
 
 ### 10.5 分支与提交
 
-- 开发在 `dev` 分支进行，稳定版本合入 `main`；发布打标签，如 `v0.1.0-m2`。
+- 开发在 `dev` 分支进行，稳定版本合入 `master`；发布打标签，如 `v0.1.0-m2`。
 - 提交信息用简洁祈使句说明改动范围与原因；涉及协议、架构或产品方向的改动，先更新 `AGENT.md`，再改代码。
 - 提交前通过 `cargo fmt`、`cargo clippy -- -D warnings`、`cargo test` 与 i18n 校验。
 

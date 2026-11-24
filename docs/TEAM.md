@@ -7,17 +7,17 @@
 | 角色 | 负责范围 | 主要文件 |
 |---|---|---|
 | 项目负责人（人类） | 决策、GitHub 账号与权限、发布审批、密钥保管 | GitHub 仓库设置、Actions Secrets |
-| 技术负责人（Lead） | 架构、协议、跨模块改动、发布把关、`main` 合并 | `crates/`、`apps/desktop/src-tauri/` |
+| 技术负责人（Lead） | 架构、协议、跨模块改动、发布把关、`master` 合并 | `crates/`、`apps/desktop/src-tauri/` |
 | 前端 / UI | 五页界面、i18n、材质与动效、组件化 | `src/`、`public/i18n/`、`index.html` |
 | 构建与发布 | 构建脚本、安装包、自动更新、CI/Release | `build.bat`、`tools/`、`.github/workflows/`、`tauri.conf.json` |
 | 文档 | README、协议、安装部署、设计说明 | `README.md`、`docs/`、`AGENT.md`、`CONTRIBUTING.md` |
 | 测试 | 功能矩阵、跨机与大数据量回归、缺陷复现 | `docs/TEST-REPORT-*.md`、`docs/screenshots/` |
 
-最小团队可以一人多角色；合并到 `main` 前至少经过一次非作者审查（人或代理）。
+最小团队可以一人多角色；合并到 `master` 前至少经过一次非作者审查（人或代理）。
 
 ## 协作约定
 
-- 分支：`main`（稳定）/ `dev`（集成）/ `feat/*`、`fix/*`（短分支），见 `CONTRIBUTING.md`。
+- 分支：`master`（稳定）/ `dev`（集成）/ `feat/*`、`fix/*`（短分支），见 `CONTRIBUTING.md`。
 - 任务拆到「一个文件或一个目录」粒度，避免多人同时改同一文件；共享任务清单记录预期写入范围。
 - 文档与代码同一次提交更新：改协议改 `docs/PROTOCOL-LP1.md`，改界面改 `docs/UI-DESIGN.md`，改构建改 `README.md` 构建章节。
 - 版本号只在一处改：`apps/desktop/src-tauri/tauri.conf.json` 的 `version` 与根 `Cargo.toml` 的 `version.workspace`，两者必须一致。
