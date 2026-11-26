@@ -65,7 +65,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1
 git checkout master; git merge --no-ff dev; git tag -a v0.1.1 -m "LanPipe 0.1.1"; git push origin master --tags
 ```
 
-Release 工作流会构建 MSI、便携版、签名并生成 `latest.json`，上传到 GitHub Release。
+Release 工作流会校验 tag 与 `apps/desktop/src-tauri/tauri.conf.json` 的 `version` 一致、校验两个签名 Secret 存在，再构建 MSI、便携版，签名并生成 `latest.json`，上传到 GitHub Release。
+
+打 tag 前必须先改版本号（`tauri.conf.json` + workspace `Cargo.toml`），否则工作流会在第一步失败。
 
 ## 报告问题
 

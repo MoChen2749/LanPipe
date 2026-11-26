@@ -7,7 +7,8 @@
 ### 新增
 
 - 项目正式化：`main` / `dev` 分支模型、贡献指南、分工与交接文档。
-- CI 与 Release 工作流：提交检查 clippy/test/i18n，打 tag 自动构建 MSI、便携版并生成 `latest.json`。
+- CI 与 Release 工作流：提交检查 clippy/test/i18n；打 tag 自动校验版本与签名 Secret，构建 MSI、便携版，签名并生成 `latest.json`，创建 GitHub Release。
+- 自动更新端点改为仓库 Release 的 `latest.json` 永久地址，自动更新链路打通（首个 Release 后可用）。
 - 打包集成：`build.bat package` / `tools/package.ps1` 一条命令产出安装包。
 - 协议文档 `docs/PROTOCOL-LP1.md`、多端部署文档 `docs/INSTALL.md`。
 

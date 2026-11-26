@@ -323,7 +323,7 @@ pwsh -ExecutionPolicy Bypass -File tools/make-portable.ps1
 
 ### 5.7 检查更新失败
 
-预期行为。当前 `plugins.updater.endpoints` 为占位地址 `https://example.invalid/lanpipe/latest.json`，尚未部署更新服务。正式发布需要替换端点并配置签名密钥（见 AGENT.md §16.12）。
+预期行为。`plugins.updater.endpoints` 指向 `https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json`，需等仓库发布过 Release（至少一个含 `latest.json` 的版本）后才会返回 200；签名密钥与发布流程见 AGENT.md §16.12。
 
 ### 5.8 安装被 SmartScreen 拦截 / 卸载后有残留
 

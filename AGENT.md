@@ -699,5 +699,8 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
   - 开发密钥 `.keys/lanpipe-updater.key`（口令 `lanpipe-dev-key`），`.gitignore` 已忽略 `.keys/`；
   - 正式发布换新密钥，CI 里用 `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`；
   - `tools/publish-release.ps1` 调 `tauri signer sign` 生成 `.sig` 并写 `latest.json`。
-- 端到端：改版本（`tauri.conf.json` + workspace `Cargo.toml`）→ `npm run build` → `npx tauri build --bundles msi` → `tools/publish-release.ps1 -Installer ... -Version ... -Url ...` → 上传 MSI 与 `latest.json`。
-- 当前状态：`endpoints` 还是 `https://example.invalid/lanpipe/latest.json` 占位，点「检查更新」会走失败分支（提示 + toast），端点换成真实地址即可用。
+- 端到端（本地）：改版本（`tauri.conf.json` + workspace `Cargo.toml`）→ `npm run build` → `npx tauri build --bundles msi` → `tools/publish-release.ps1 -Installer ... -Version ... -Url ...` → 上传 MSI 与 `latest.json`。
+- 端到端（CI，推荐）：`git tag vX.Y.Z && git push origin vX.Y.Z` → `.github/workflows/release.yml` 校验 tag 与 `tauri.conf.json` 版本一致、校验两个 Secret 存在 → 构建 MSI（zh-CN）+ 便携 zip → 签名生成 `.msi.sig` 与 `latest.json`（UTF-8 **无 BOM**）→ 创建 GitHub Release 并上传四个产物。
+- `plugins.updater.endpoints` = `https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json`（GitHub Release 的永久最新地址），`windows.installMode = passive`。
+- `tools/publish-release.ps1` 已支持 CI：私钥文件不存在时从环境变量 `TAURI_SIGNING_PRIVATE_KEY` 读取内容写临时文件，并在调用 `tauri signer sign` 前临时清除该变量（signer 不允许 `--private-key` 与 `--private-key-path` 同时出现）；`latest.json` 用 `WriteAllText` + 无 BOM UTF8 写出（serde_json 不接受 BOM）。
+- 当前状态：端点已指向 GitHub Release。首个 Release 发布后「检查更新」即可真实工作；升级链路（下载 MSI → `passive` 安装）待首个版本之后再实测。

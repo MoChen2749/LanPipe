@@ -21,6 +21,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 校验版本与签名密钥
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart("v")
+          $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          if ($conf.version -ne $version) {
+            throw "tag 版本 $version 与 tauri.conf.json 版本 $($conf.version) 不一致：请先更新版本号再打 tag"
+          }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw "缺少仓库 Secret：TAURI_SIGNING_PRIVATE_KEY" }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { throw "缺少仓库 Secret：TAURI_SIGNING_PRIVATE_KEY_PASSWORD" }
+          Write-Host "版本 $version 校验通过"
+
       - name: 安装 Node
         uses: actions/setup-node@v4
         with:
@@ -61,6 +74,21 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File tools/publish-release.ps1 `
             -Installer $msi.FullName -Version $version -Url $url -Notes "LanPipe $version" `
             -OutFile target/release/bundle/latest.json
+
+      - name: 校验产物齐全
+        shell: powershell
+        run: |
+          $msi = @(Get-ChildItem target/release/bundle/msi/*.msi)
+          $sig = @(Get-ChildItem target/release/bundle/msi/*.msi.sig)
+          $zip = @(Get-ChildItem target/release/bundle/portable/*.zip)
+          $latest = "target/release/bundle/latest.json"
+          if ($msi.Count -lt 1) { throw "未找到 MSI 安装包" }
+          if ($sig.Count -lt 1) { throw "未找到 MSI 签名（.msi.sig）" }
+          if ($zip.Count -lt 1) { throw "未找到便携版 zip" }
+          if (-not (Test-Path $latest)) { throw "未找到 latest.json" }
+          $raw = Get-Content $latest -Raw
+          if ($raw[0] -eq [char]0xFEFF) { throw "latest.json 带 BOM，会导致更新解析失败" }
+          Write-Host "产物校验通过：$($msi[0].Name) $($msi[0].Length) B / $($zip[0].Name) $($zip[0].Length) B"
 
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@v2

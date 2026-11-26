@@ -228,7 +228,7 @@ flowchart LR
 - Windows 是唯一完成桌面验证的平台；macOS 与 Linux 桌面端未验证。
 - WebView2 145.x / 154.x 存在窗口透明回归（上游 #5481、#5752），程序会自动回退纯色背景，诊断页显示 WebView2 版本与回退提示。
 - NSIS 安装包静默安装（`/S`）返回 0 但不落盘，当前不作为交付形态（待查）；MSI 为主交付。
-- 自动更新端点为占位 `https://example.invalid/lanpipe/latest.json`，检查更新必然失败；正式发布需替换端点并配置签名密钥。
+- 自动更新端点指向 GitHub Release：`https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json`。首个 Release（`v0.1.0`）发布后即可真实检查更新；升级安装链路待下一版本验证。
 - 目前只发布 x64 MSI 与便携 zip。
 
 ## 9. 文档索引
@@ -291,7 +291,7 @@ Windows 上若 `cargo test` 报 MSVC `D8050`（编译 ring 时无法写入调试
 ### 10.4 持续集成
 
 - `.github/workflows/ci.yml`：push/PR 到 `master`、`dev` 时跑 i18n 检查、前端构建、`cargo test`、`clippy -D warnings` 与 release 构建。
-- `.github/workflows/release.yml`：推送 `v*` tag 时构建 MSI、便携版、签名并生成 `latest.json`，创建 GitHub Release。
+- `.github/workflows/release.yml`：推送 `v*` tag 时先校验 tag 与 `tauri.conf.json` 版本一致、两个签名 Secret 存在，再构建 MSI、便携版，签名并生成 `latest.json`，创建 GitHub Release。
 
 ### 10.5 分支与提交
 
