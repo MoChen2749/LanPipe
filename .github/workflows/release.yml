@@ -42,6 +42,8 @@ jobs:
       - name: 失败诊断（仅上报长度，不泄露内容）
         if: failure()
         shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart("v")
@@ -57,7 +59,7 @@ jobs:
           $body = @{ title = "[diag] Release 校验失败 $env:GITHUB_RUN_ID"; body = ($lines -join "`n") } | ConvertTo-Json
           try {
             Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/issues" `
-              -Headers @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = "application/vnd.github+json" } `
+              -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json" } `
               -Body $body -ContentType "application/json" | Out-Null
             Write-Host "诊断已上报为 issue"
           } catch {
