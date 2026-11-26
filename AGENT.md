@@ -128,7 +128,7 @@
 
 **帧格式**：12 字节大端帧头 `magic "LPK1"(4) | type u8 | flags u8 | stream u16 | len u32`，payload 为 JSON（控制帧）或 `id u32 | offset u64 | 原始数据`（DATA）。`MAX_CONTROL_FRAME = 64 MiB`、`MAX_DATA_FRAME = 4 MiB`、`DATA_CHUNK = 512 KiB`；**无 CRC**（完整性靠逐文件 xxh64）。
 
-**落盘**：`<下载根>/<root_name>/<相对路径>.lp-part` → flush/fsync → `rename`；目录在 Accept 后后台创建；`root_name` 做单层校验（拒绝绝对路径与 `..`）。
+**落盘**：`<下载根>/<root_name>/<相对路径>.lp-part` → flush/fsync → `rename`；目录在 Accept 后后台创建；`root_name` 做单层校验（拒绝绝对路径、`..`、反斜杠与冒号，保证 Windows 与 Linux 行为一致）。
 
 **续传**：`manifest_digest = xxh64(排序后的 path\0size\0mtime\0is_dir\n)`；接收端 journal `journals/<dest_key>-<digest>.jsonl` 记录 `{id,size,xxh64}` 与头部 `{"root": "<name>"}`，重发同一清单时跳过已完成文件；journal 默认保留 30 天并在接收会话开始时后台清理过期项（`journal::prune`）；单文件内部偏移（`ResumeState.partial`）当前未启用。
 
