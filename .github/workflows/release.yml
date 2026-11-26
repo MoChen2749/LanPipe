@@ -27,7 +27,7 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart("v")
-          $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw -Encoding UTF8 | ConvertFrom-Json
           # 只打印长度与是否为空，避免泄露密钥内容（排查 Secret 是否配齐用）。
           Write-Host "tag=$tag / tag 版本=$version / tauri.conf 版本=$($conf.version)"
           Write-Host "TAURI_SIGNING_PRIVATE_KEY 长度=$($env:TAURI_SIGNING_PRIVATE_KEY.Length)"
@@ -47,7 +47,7 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart("v")
-          $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw -Encoding UTF8 | ConvertFrom-Json
           $lines = @(
             "tag=$tag",
             "tag 版本=$version",
