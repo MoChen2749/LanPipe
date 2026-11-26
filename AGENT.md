@@ -706,6 +706,7 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 - 当前状态（2026-11-26）：`v0.1.0` 已发布，Release 含 `LanPipe_0.1.0_x64_zh-CN.msi`、`.msi.sig`、`LanPipe_0.1.0_x64-portable.zip`、`latest.json`；`https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json` 返回 200 且无 BOM；安装该 MSI 后点「检查更新」实测路径为 `正在检查… → 已是最新版本`。
 - 发布工作流踩坑：Windows PowerShell 5.1 的 `Get-Content` 默认按 ANSI 读文件，`tauri.conf.json` 含中文时 `ConvertFrom-Json` 会失败，必须加 `-Encoding UTF8`；`tauri signer sign` 不允许同时给 `--private-key` 与 `--private-key-path`。
 - 待做：升级链路真机实测（发布更高版本 → 下载 MSI → passive 安装 → 版本变化）、正式签名密钥替换、MSI 代码签名。
+- 版本节奏：`0.1.0`（2026-11-26 首发，Windows MSI/便携/自动更新）；`0.1.1` 增加 Linux 构建与 deb 发布（Release 产物含 `LanPipe_0.1.1_amd64.deb`）。
 
 ### 16.13 Linux 多端构建与平台隔离（2026-11-26）
 

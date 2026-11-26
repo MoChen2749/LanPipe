@@ -4,11 +4,15 @@
 
 ## [未发布]
 
+暂无。
+
+## [0.1.1] - 2026-11-26
+
 ### 新增
 
-- 项目正式化：`main` / `dev` 分支模型、贡献指南、分工与交接文档。
+- 项目正式化：`master` / `dev` 分支模型、贡献指南、分工与交接文档。
 - CI 与 Release 工作流：提交检查 clippy/test/i18n；打 tag 自动校验版本与签名 Secret，构建 MSI、便携版，签名并生成 `latest.json`，创建 GitHub Release。
-- 自动更新端点改为仓库 Release 的 `latest.json` 永久地址，自动更新链路打通（首个 Release 后可用）。
+- 自动更新端点改为仓库 Release 的 `latest.json` 永久地址，自动更新链路打通，v0.1.0 发布后「检查更新」实测通过。
 - 打包集成：`build.bat package` / `tools/package.ps1` 一条命令产出安装包。
 - 协议文档 `docs/PROTOCOL-LP1.md`、多端部署文档 `docs/INSTALL.md`。
 - Linux 支持：`tools/build-linux.sh`（deps/cli/desktop/bundle）、`tools/build-linux.ps1`（Windows 端交叉编译静态 CLI，或用 WSL 构建桌面端与 deb）；桌面端代码完成平台隔离，可在 Linux 编译运行；deb 依赖补 `fonts-noto-cjk`。
@@ -16,7 +20,7 @@
 
 ### 修复
 
-- 修复接收端 `Offer.root_name` 未校验导致的路径穿越风险（仅接受单层目录名）。
+- 修复接收端 `Offer.root_name` 未校验导致的路径穿越风险（仅接受单层目录名，且拒绝反斜杠与冒号）。
 - 修复续传时残留 `.lp-part` 不会被清理的问题（删除目标文件后重发可正确重建）。
 - 修复大量小文件传输时的校验竞态：接收端在数据连接尚未处理完就发 `Verify`，导致发送端误重传、与在途帧并发写同一文件（表现为 `rename 拒绝访问`、残留 `.lp-part`、连接被重置）。现在接收端等所有文件落地后再出校验清单，并新增 6,000 文件回归测试。
 
