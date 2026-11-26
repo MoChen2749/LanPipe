@@ -390,6 +390,11 @@ fn part_path_for(final_path: &Path) -> PathBuf {
 /// 校验清单路径：拒绝绝对路径与 `..`。
 /// 只接受单层目录名（不能是绝对路径、`..`、多级路径），否则返回 None。
 fn safe_root_name(raw: &str) -> Option<String> {
+    // 反斜杠与冒号在 Windows 上是路径分隔符/盘符；Linux 上虽是合法文件名字符，
+    // 但来源是对方发来的目录名，出现它们基本意味着路径残留，统一拒绝以保证跨平台一致。
+    if raw.contains('\\') || raw.contains(':') {
+        return None;
+    }
     let path = safe_rel(raw)?;
     let mut components = path.components();
     let first = components.next()?;
