@@ -64,7 +64,13 @@ jobs:
             Write-Host "诊断已上报为 issue"
           } catch {
             Write-Host "诊断上报失败：$($_.Exception.Message)"
-            ($lines -join "`n") | Write-Host
+            # 兜底：把诊断写进 diag 分支，便于免登录读取。
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            ($lines -join "`n") | Set-Content -Path diag.txt -Encoding UTF8
+            git add diag.txt
+            git commit -m "diag $env:GITHUB_RUN_ID" | Out-Null
+            git push "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" HEAD:refs/heads/diag
           }
 
       - name: 安装 Node
