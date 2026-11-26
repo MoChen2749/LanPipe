@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
 
 jobs:
   release:
@@ -24,53 +23,37 @@ jobs:
 
       - name: 校验版本与签名密钥
         shell: powershell
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $version = $tag.TrimStart("v")
-          $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw -Encoding UTF8 | ConvertFrom-Json
-          # 只打印长度与是否为空，避免泄露密钥内容（排查 Secret 是否配齐用）。
-          Write-Host "tag=$tag / tag 版本=$version / tauri.conf 版本=$($conf.version)"
-          Write-Host "TAURI_SIGNING_PRIVATE_KEY 长度=$($env:TAURI_SIGNING_PRIVATE_KEY.Length)"
-          Write-Host "TAURI_SIGNING_PRIVATE_KEY_PASSWORD 长度=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD.Length)"
-          if ($conf.version -ne $version) {
-            throw "tag 版本 $version 与 tauri.conf.json 版本 $($conf.version) 不一致：请先更新版本号再打 tag"
-          }
-          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw "缺少仓库 Secret：TAURI_SIGNING_PRIVATE_KEY" }
-          if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { throw "缺少仓库 Secret：TAURI_SIGNING_PRIVATE_KEY_PASSWORD" }
-          Write-Host "版本 $version 校验通过"
-
-      - name: 失败诊断（仅上报长度，不泄露内容）
-        if: failure()
-        shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart("v")
-          $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw -Encoding UTF8 | ConvertFrom-Json
-          $lines = @(
-            "tag=$tag",
-            "tag 版本=$version",
-            "tauri.conf 版本=$($conf.version)",
-            "TAURI_SIGNING_PRIVATE_KEY 长度=$($env:TAURI_SIGNING_PRIVATE_KEY.Length)",
-            "TAURI_SIGNING_PRIVATE_KEY_PASSWORD 长度=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD.Length)",
-            "run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-          )
-          $body = @{ title = "[diag] Release 校验失败 $env:GITHUB_RUN_ID"; body = ($lines -join "`n") } | ConvertTo-Json
           try {
-            Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/issues" `
-              -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json" } `
-              -Body $body -ContentType "application/json" | Out-Null
-            Write-Host "诊断已上报为 issue"
+            $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($conf.version -ne $version) {
+              throw "tag 版本 $version 与 tauri.conf.json 版本 $($conf.version) 不一致"
+            }
+            if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw "缺少 Secret TAURI_SIGNING_PRIVATE_KEY" }
+            if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { throw "缺少 Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD" }
+            Write-Host "版本 $version 校验通过"
           } catch {
-            Write-Host "诊断上报失败：$($_.Exception.Message)"
-            # 兜底：把诊断写进 diag 分支，便于免登录读取。
+            $detail = @(
+              "error=$($_.Exception.Message)",
+              "script_line=$($_.InvocationInfo.ScriptLineNumber)",
+              "tag=$tag",
+              "version=$version",
+              "conf_version=$($conf.version)",
+              "key_len=$($env:TAURI_SIGNING_PRIVATE_KEY.Length)",
+              "pwd_len=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD.Length)"
+            ) -join "`n"
             git config user.name "github-actions"
             git config user.email "github-actions@users.noreply.github.com"
-            ($lines -join "`n") | Set-Content -Path diag.txt -Encoding UTF8
-            git add diag.txt
-            git commit -m "diag $env:GITHUB_RUN_ID" | Out-Null
-            git push "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" HEAD:refs/heads/diag
+            git checkout -B diag
+            Set-Content -Path ci-diag.txt -Value $detail -Encoding UTF8
+            git add ci-diag.txt
+            git commit -m "diag" | Out-Null
+            git push -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" diag
+            throw
           }
 
       - name: 安装 Node
@@ -91,7 +74,7 @@ jobs:
       - name: 构建前端
         run: npm run build
 
-      - name: 打包 MSI（带更新签名）
+      - name: 打包 MSI
         run: |
           $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
           cd apps/desktop/src-tauri
@@ -109,7 +92,6 @@ jobs:
           $version = $tag.TrimStart("v")
           $msi = Get-ChildItem target/release/bundle/msi/*.msi | Select-Object -First 1
           $url = "https://github.com/${{ github.repository }}/releases/download/$tag/$($msi.Name)"
-          $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}"
           powershell -NoProfile -ExecutionPolicy Bypass -File tools/publish-release.ps1 `
             -Installer $msi.FullName -Version $version -Url $url -Notes "LanPipe $version" `
             -OutFile target/release/bundle/latest.json
@@ -122,12 +104,12 @@ jobs:
           $zip = @(Get-ChildItem target/release/bundle/portable/*.zip)
           $latest = "target/release/bundle/latest.json"
           if ($msi.Count -lt 1) { throw "未找到 MSI 安装包" }
-          if ($sig.Count -lt 1) { throw "未找到 MSI 签名（.msi.sig）" }
+          if ($sig.Count -lt 1) { throw "未找到 MSI 签名" }
           if ($zip.Count -lt 1) { throw "未找到便携版 zip" }
           if (-not (Test-Path $latest)) { throw "未找到 latest.json" }
           $raw = Get-Content $latest -Raw
-          if ($raw[0] -eq [char]0xFEFF) { throw "latest.json 带 BOM，会导致更新解析失败" }
-          Write-Host "产物校验通过：$($msi[0].Name) $($msi[0].Length) B / $($zip[0].Name) $($zip[0].Length) B"
+          if ($raw[0] -eq [char]0xFEFF) { throw "latest.json 带 BOM" }
+          Write-Host "产物校验通过：$($msi[0].Name) / $($zip[0].Name)"
 
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@v2
@@ -140,7 +122,7 @@ jobs:
             target/release/bundle/portable/*.zip
             target/release/bundle/latest.json
 
-      - name: 上传构建产物（调试用）
+      - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: LanPipe-${{ github.ref_name }}
