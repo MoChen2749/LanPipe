@@ -703,9 +703,10 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 - 端到端（CI，推荐）：`git tag vX.Y.Z && git push origin vX.Y.Z` → `.github/workflows/release.yml` 校验 tag 与 `tauri.conf.json` 版本一致、校验两个 Secret 存在 → 构建 MSI（zh-CN）+ 便携 zip → 签名生成 `.msi.sig` 与 `latest.json`（UTF-8 **无 BOM**）→ 创建 GitHub Release 并上传四个产物。
 - `plugins.updater.endpoints` = `https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json`（GitHub Release 的永久最新地址），`windows.installMode = passive`。
 - `tools/publish-release.ps1` 已支持 CI：私钥文件不存在时从环境变量 `TAURI_SIGNING_PRIVATE_KEY` 读取内容写临时文件，并在调用 `tauri signer sign` 前临时清除该变量（signer 不允许 `--private-key` 与 `--private-key-path` 同时出现）；`latest.json` 用 `WriteAllText` + 无 BOM UTF8 写出（serde_json 不接受 BOM）。
-- 当前状态（2026-11-26）：`v0.1.0` 已发布，Release 含 `LanPipe_0.1.0_x64_zh-CN.msi`、`.msi.sig`、`LanPipe_0.1.0_x64-portable.zip`、`latest.json`；`https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json` 返回 200 且无 BOM；安装该 MSI 后点「检查更新」实测路径为 `正在检查… → 已是最新版本`。
+- 当前状态（2026-11-26）：`v0.1.0`、`v0.1.1` 均已发布。`v0.1.1` Release 含 `LanPipe_0.1.1_x64_zh-CN.msi`、`.msi.sig`、`LanPipe_0.1.1_x64-portable.zip`、`latest.json`、`LanPipe_0.1.1_amd64.deb`（Linux 作业构建并追加）；`latest.json` 返回 200 且无 BOM。
+- 升级链路实测（2026-11-26）：安装 `v0.1.0` → 「检查更新」显示「发现新版本 0.1.1」（`docs/screenshots/update-found.png`）；覆盖安装 `v0.1.1` MSI 后 `ProductVersion=0.1.1`、界面显示「版本 0.1.1」且「检查更新」为「已是最新版本」（`docs/screenshots/update-upgraded.png`）。当前 UI 只做检测与提示，不下发下载/自动安装（tauri-plugin-updater 的 download/install 未接）。
 - 发布工作流踩坑：Windows PowerShell 5.1 的 `Get-Content` 默认按 ANSI 读文件，`tauri.conf.json` 含中文时 `ConvertFrom-Json` 会失败，必须加 `-Encoding UTF8`；`tauri signer sign` 不允许同时给 `--private-key` 与 `--private-key-path`。
-- 待做：升级链路真机实测（发布更高版本 → 下载 MSI → passive 安装 → 版本变化）、正式签名密钥替换、MSI 代码签名。
+- 待做：自动下载并静默安装更新（`updater.download`/`install` + 重启）、正式签名密钥替换、MSI 代码签名。
 - 版本节奏：`0.1.0`（2026-11-26 首发，Windows MSI/便携/自动更新）；`0.1.1` 增加 Linux 构建与 deb 发布（Release 产物含 `LanPipe_0.1.1_amd64.deb`）。
 
 ### 16.13 Linux 多端构建与平台隔离（2026-11-26）
