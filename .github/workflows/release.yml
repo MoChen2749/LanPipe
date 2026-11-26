@@ -23,38 +23,16 @@ jobs:
 
       - name: 校验版本与签名密钥
         shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart("v")
-          try {
-            $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($conf.version -ne $version) {
-              throw "tag 版本 $version 与 tauri.conf.json 版本 $($conf.version) 不一致"
-            }
-            if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw "缺少 Secret TAURI_SIGNING_PRIVATE_KEY" }
-            if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { throw "缺少 Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD" }
-            Write-Host "版本 $version 校验通过"
-          } catch {
-            $detail = @(
-              "error=$($_.Exception.Message)",
-              "script_line=$($_.InvocationInfo.ScriptLineNumber)",
-              "tag=$tag",
-              "version=$version",
-              "conf_version=$($conf.version)",
-              "key_len=$($env:TAURI_SIGNING_PRIVATE_KEY.Length)",
-              "pwd_len=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD.Length)"
-            ) -join "`n"
-            git config user.name "github-actions"
-            git config user.email "github-actions@users.noreply.github.com"
-            git checkout -B diag
-            Set-Content -Path ci-diag.txt -Value $detail -Encoding UTF8
-            git add ci-diag.txt
-            git commit -m "diag" | Out-Null
-            git push -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" diag
-            throw
+          $conf = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($conf.version -ne $version) {
+            throw "tag 版本 $version 与 tauri.conf.json 版本 $($conf.version) 不一致"
           }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw "缺少 Secret TAURI_SIGNING_PRIVATE_KEY" }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { throw "缺少 Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD" }
+          Write-Host "版本 $version 校验通过"
 
       - name: 安装 Node
         uses: actions/setup-node@v4
