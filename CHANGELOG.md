@@ -11,6 +11,8 @@
 - 自动更新端点改为仓库 Release 的 `latest.json` 永久地址，自动更新链路打通（首个 Release 后可用）。
 - 打包集成：`build.bat package` / `tools/package.ps1` 一条命令产出安装包。
 - 协议文档 `docs/PROTOCOL-LP1.md`、多端部署文档 `docs/INSTALL.md`。
+- Linux 支持：`tools/build-linux.sh`（deps/cli/desktop/bundle）、`tools/build-linux.ps1`（Windows 端交叉编译静态 CLI，或用 WSL 构建桌面端与 deb）；桌面端代码完成平台隔离，可在 Linux 编译运行；deb 依赖补 `fonts-noto-cjk`。
+- CI / Release 增加 Linux 作业：校验依赖、构建静态 CLI 与桌面端、测试，发布时构建 deb 并追加到同一 Release。
 
 ### 修复
 

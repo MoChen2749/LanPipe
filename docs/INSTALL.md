@@ -1,6 +1,6 @@
 # LanPipe 安装与部署指南
 
-适用版本：`0.1.0`。最后更新：2026-11-23。
+适用版本：`0.1.0`。最后更新：2026-11-26。
 
 本指南覆盖三类目标：
 
@@ -8,7 +8,8 @@
 | --- | --- |
 | Windows 桌面端（MSI / 便携版 / 源码构建） | 已验证 |
 | Linux CLI（WSL2 Ubuntu 24.04） | 已在测试中验证 |
-| Linux 桌面端、macOS | 未验证，仅提供构建路径 |
+| Linux 桌面端（WSL2 Ubuntu 24.04 + WSLg） | 已构建并启动，中文显示正常 |
+| Linux AppImage、原生 Linux 桌面、macOS | 未验证，仅提供构建路径 |
 
 通用前置说明：
 
@@ -117,7 +118,24 @@ Get-NetFirewallRule -DisplayName 'LanPipe*' | Format-Table Name, Enabled, Direct
 
 ## 2. Linux
 
-### 2.1 命令行版（已验证路径）
+构建脚本：`tools/build-linux.sh`（原生 Linux、WSL、容器、CI 通用）。
+
+```bash
+bash tools/build-linux.sh deps      # 检查工具链与系统库
+bash tools/build-linux.sh cli       # 静态 CLI -> dist-linux/lanpipe-cli
+bash tools/build-linux.sh desktop   # 桌面程序 -> dist-linux/lanpipe
+bash tools/build-linux.sh bundle    # 安装包 -> target/release/bundle/
+BUNDLES=deb bash tools/build-linux.sh bundle
+```
+
+在 Windows 上可用 `tools/build-linux.ps1`：`cli` 直接交叉编译出 Linux 静态二进制（rust 自带 lld，不需要 WSL），`desktop`/`bundle`/`deps` 通过 WSL 执行。
+
+```powershell
+powershell -File tools/build-linux.ps1 -Command cli
+powershell -File tools/build-linux.ps1 -Command bundle -Distro lanpipe-build
+```
+
+### 2.1 命令行版
 
 适用于服务器、WSL 与脚本化传输。依赖 Rust stable 与 C 工具链：
 
@@ -127,13 +145,14 @@ sudo apt install -y build-essential curl
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-在仓库根目录构建：
+构建（二选一）：
 
 ```bash
 cargo build --release -p lanpipe-cli
+bash tools/build-linux.sh cli
 ```
 
-产物为 `target/release/lanpipe-cli`，可复制到 `PATH` 目录。使用方式：
+产物为 `target/release/lanpipe-cli` 或 `dist-linux/lanpipe-cli`，可复制到 `PATH` 目录。使用方式：
 
 ```bash
 # 接收端
@@ -147,14 +166,16 @@ cargo build --release -p lanpipe-cli
 - 状态目录优先级：`LANPIPE_STATE_DIR` → `$XDG_STATE_HOME/lanpipe` → `~/.local/state/lanpipe`。
 - 已验证环境为 WSL2 Ubuntu 24.04（NAT 网络）；原生 Linux 发行版未单独验证。
 - 防火墙：若启用了 ufw/firewalld，需要放行 UDP 53310 与 TCP 53311 入站。
+- 静态二进制可直接拷到任意 x86-64 Linux（musl，无 glibc 版本要求）。
 
-### 2.2 桌面版（未验证）
+### 2.2 桌面版
 
-Tauri v2 在 Ubuntu/Debian 上的系统依赖：
+系统依赖：
 
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
-  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
+  libjavascriptcoregtk-4.1-dev libsoup-3.0-dev patchelf
 ```
 
 较旧发行版若没有 `libwebkit2gtk-4.1-dev`，改用 `libwebkit2gtk-4.0-dev`；使用 `libappindicator3-dev` 的系统可替换 `libayatana-appindicator3-dev`。
@@ -162,28 +183,21 @@ sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
 构建：
 
 ```bash
-npm install
-npm run build
-cd apps/desktop/src-tauri
-npx tauri build --bundles deb,appimage
+npm ci
+bash tools/build-linux.sh bundle            # deb + AppImage
+BUNDLES=deb bash tools/build-linux.sh bundle  # 仅 deb
 ```
 
 注意：
 
-- `apps/desktop/src-tauri/tauri.conf.json` 的 `bundle.targets` 目前只声明 `msi`（Windows），Linux 上需用 `--bundles` 显式覆盖，或本地修改该配置；
-- 产物位于仓库根目录的 `target/release/bundle/deb/` 与 `target/release/bundle/appimage/`；
-- 预计配置路径为 `~/.config/LanPipe/config.json`（Tauri 配置目录 + `LanPipe`），未在原生 Linux 桌面验证；
-- Mica/Acrylic 材质为 Windows 实现，Linux 上的窗口外观未做视觉验收。
+- `tauri.conf.json` 的 `bundle.targets` 只声明 `msi`（Windows），Linux 上用 `--bundles` 覆盖，构建脚本已处理；
+- deb 产物依赖里带 `fonts-noto-cjk`，避免缺中文字体时界面显示方块；其他发行版如无中文字形请手动安装 `Noto Sans CJK`；
+- 已验证：WSL2 Ubuntu 24.04 下构建成功并在 WSLg 中启动，中文渲染正常（`docs/screenshots/linux-wslg.png`）。原生 Linux 桌面与 AppImage 未验证；
+- 材质：Mica/Acrylic 为 Windows 实现，Linux 走普通 GTK 窗口。
 
-### 2.3 从 Windows 经 WSL 交叉构建
+### 2.3 测试 Linux 版时的网络注意
 
-`build.bat` 的交叉编译项通过 WSL 执行：
-
-```bash
-cargo build --release --features custom-protocol -p lanpipe
-```
-
-WSL 内需安装 Rust、`build-essential` 与 `libwebkit2gtk-4.1-dev`。该路径用于生成 Linux 可执行文件，运行效果未验证。
+WSL2 的 localhost 转发（`wslrelay.exe`）会占用 `127.0.0.1:53311`，Windows 上测桌面端接收时请用本机 LAN IP，不要用 `127.0.0.1`。
 
 ## 3. macOS（未验证）
 
@@ -372,9 +386,9 @@ Get-Content "$env:TEMP\LanPipe\lanpipe.log" -Tail 200
 | Windows 防火墙一键放行 | 已验证（`profile=any`） |
 | 25 GB / 43,594 文件传输（Windows ↔ WSL2） | 已验证 |
 | Linux CLI 构建与传输 | 已在 WSL2 Ubuntu 24.04 验证 |
-| Linux 桌面端构建与运行 | 未验证 |
+| Linux 桌面端构建与运行（WSLg） | 已构建、启动、截图验证中文 |
 | macOS 构建与运行 | 未验证 |
 | Windows ARM64 构建产物运行 | 未验证 |
 | NSIS 静默安装 | 未通过，待查 |
-| 自动更新 | 骨架存在，端点未部署 |
+| 自动更新 | 已发布 v0.1.0，检查更新实测通过；升级链路未测 |
 | 真实物理 1 GbE / 2.5 GbE 吞吐 | 未验证 |

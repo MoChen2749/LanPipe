@@ -706,3 +706,26 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 - 当前状态（2026-11-26）：`v0.1.0` 已发布，Release 含 `LanPipe_0.1.0_x64_zh-CN.msi`、`.msi.sig`、`LanPipe_0.1.0_x64-portable.zip`、`latest.json`；`https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json` 返回 200 且无 BOM；安装该 MSI 后点「检查更新」实测路径为 `正在检查… → 已是最新版本`。
 - 发布工作流踩坑：Windows PowerShell 5.1 的 `Get-Content` 默认按 ANSI 读文件，`tauri.conf.json` 含中文时 `ConvertFrom-Json` 会失败，必须加 `-Encoding UTF8`；`tauri signer sign` 不允许同时给 `--private-key` 与 `--private-key-path`。
 - 待做：升级链路真机实测（发布更高版本 → 下载 MSI → passive 安装 → 版本变化）、正式签名密钥替换、MSI 代码签名。
+
+### 16.13 Linux 多端构建与平台隔离（2026-11-26）
+
+**构建脚本**
+- `tools/build-linux.sh`：Linux 原生 / WSL / 容器 / CI 通用。命令 `deps | cli | desktop | bundle | all | clean`；环境变量 `SKIP_FRONTEND=1`、`BUNDLES=deb,appimage`（默认）。`deps` 检查 `cc/pkg-config/cargo/rustc` + `gtk+-3.0`、`webkit2gtk-4.1`、`javascriptcoregtk-4.1`、`libsoup-3.0`、`ayatana-appindicator3-0.1`、`librsvg-2.0` + `patchelf/file/dpkg-deb`，缺依赖时打印 Debian/Fedora/Arch 安装命令。`desktop` 产物 `dist-linux/lanpipe`，`bundle` 产物在 `target/release/bundle/` 并复制到 `dist-linux/`。
+- `tools/build-linux.ps1`（Windows 入口，UTF-8 **带 BOM**）：`-Command cli|desktop|bundle|deps`、`-Distro <WSL 发行版>`。
+  - `cli` 不需要 WSL：`rustup target add x86_64-unknown-linux-musl`，用 rust 自带 `rust-lld`（`<sysroot>/lib/rustlib/x86_64-pc-windows-msvc/bin/rust-lld.exe`）配 `CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=<rust-lld>`、`RUSTFLAGS="-C link-self-contained=yes -C linker-flavor=ld.lld"` 交叉编译，产物静态 ELF（约 1.0 MB），校验 ELF 魔数并打印 size/sha256。
+  - `desktop/bundle/deps` 经 `wsl.exe -d <Distro> -u root -- bash -lc` 调用 `build-linux.sh`，路径转 `/mnt/<drive>/...`。
+  - PowerShell 5.1 会把原生命令的 stderr 当 `NativeCommandError` 并让脚本以 1 退出，脚本里已设 `$ErrorActionPreference = "Continue"` 并显式 `exit 0`。
+
+**桌面端平台隔离**（此前代码只能在 Windows 编译）
+- `Cargo.toml`：`windows-version = "0.1"` 移到 `[target.'cfg(windows)'.dependencies]`。
+- `main.rs`：`#[cfg(windows)] mod firewall;`，非 Windows 提供同名 stub（`status()=true`、`is_elevated()=true`、`allow()=Ok(true)`）；新增 `fn os_build() -> u64`（Windows 读 `windows_version::OsVersion`，其他平台 0）替换 4 处直接调用；`DwmMargins`、`#[link(name="user32")]`、`#[link(name="dwmapi")]`、`tune_window_frame`、`mica_effect`、`backdrop_candidates` 全部 `#[cfg(windows)]`（非 Windows no-op）；`window_shadow()` 用 `os_build() >= 22000`。
+- `settings.rs`：`default_download_dir` 在 `app.path().download_dir()` 失败时退回 `$HOME/Downloads`（不存在用 `$HOME`）再拼 `LanPipe`，避免无 XDG 环境启动失败。
+- 中文字体：`src/styles/fluent-tokens.css` 的三处 `--font` 末尾加 `'Noto Sans CJK SC', 'Noto Sans SC', 'Source Han Sans SC', 'WenQuanYi Micro Hei'`；`tauri.conf.json` 的 `bundle.linux.deb.depends = ["fonts-noto-cjk"]`，避免缺字形显示方块。
+
+**验证结果**
+- Windows：`cargo check -p lanpipe` 通过；
+- Linux：WSL2 Ubuntu 24.04 内 `SKIP_FRONTEND=1 bash tools/build-linux.sh desktop` 4m19s 通过，`dist-linux/lanpipe` 8.5 MB，WSLg 中启动成功（settings/net/window/tray/page_load 全 OK），`docs/screenshots/linux-wslg.png` 为中文正常渲染的截图；
+- deb：`LanPipe_0.1.0_amd64.deb` 构建成功；AppImage 因下载 `AppRun`/`linuxdeploy` 失败未验证。
+- 截图方法（WSL 无 X 抓图能力时）：`Xvfb :99 -screen 0 1100x820x24 -extension GLX`，应用以 `setsid env DISPLAY=:99 GDK_BACKEND=x11 WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_GL=disable LIBGL_ALWAYS_SOFTWARE=1 ./dist-linux/lanpipe` 启动，再 `DISPLAY=:99 import -window root shot.png`；WSLg 直接抓 `:0` 会报 `Resource temporarily unavailable`。注意 bash 里 `"$@"` 必须放在 `env` 之后，写成命令前缀会导致 `command not found`。
+- CI：`ci.yml` 的 `linux` 作业（ubuntu-24.04）跑 deps、cli、`cargo test`、desktop 构建；`release.yml` 的 `linux` 作业（ubuntu-24.04）用 `BUNDLES=deb` 构建 deb、校验依赖含 `fonts-noto-cjk`，再用 `softprops/action-gh-release` 追加到同一 Release。
+- 已知限制：WSL2 的 `wslrelay.exe` 占用 `127.0.0.1:53311`，本机测桌面接收端要用 LAN IP；Linux 桌面窗口为普通 GTK 外观，无 Mica/Acrylic。

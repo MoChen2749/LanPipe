@@ -1,6 +1,23 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
 mod firewall;
+#[cfg(not(windows))]
+mod firewall {
+    //! 非 Windows 平台没有 netsh 防火墙规则，前端据此显示「无需放行」。
+
+    pub fn status() -> bool {
+        true
+    }
+
+    pub fn is_elevated() -> bool {
+        true
+    }
+
+    pub fn allow(_program: &std::path::Path, _udp: u16, _tcp: u16) -> Result<bool, String> {
+        Ok(true)
+    }
+}
 mod net;
 mod settings;
 
@@ -376,7 +393,7 @@ fn diagnostics(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     Ok(json!({
         "version": env!("CARGO_PKG_VERSION"),
         "builtAt": BUILT_AT_SECS.trim().parse::<u64>().unwrap_or(0),
-        "osBuild": windows_version::OsVersion::current().build,
+        "osBuild": os_build(),
         "webviewVersion": webview_runtime().unwrap_or_default(),
         "transparencyRegressed": transparency_regressed(),
         "backdrop": backdrop,
@@ -571,6 +588,7 @@ pub struct BackdropState(pub std::sync::Mutex<String>);
 /// - Mica 需要 Windows 11（build >= 22000），且不支持时系统只回退纯色；
 /// - Acrylic 需要 Windows 10 1809（build >= 17763）以上；
 /// - 不支持的一律用纯色，避免出现"透明窗口直接看到桌面"的问题。
+#[cfg(windows)]
 fn mica_effect(theme: &str) -> tauri::window::Effect {
     use tauri::window::Effect;
     // DWM 的 Mica 有明确的浅色/深色变体；用变体而不是让系统按系统主题取色，
@@ -582,6 +600,7 @@ fn mica_effect(theme: &str) -> tauri::window::Effect {
     }
 }
 
+#[cfg(windows)]
 fn backdrop_candidates(theme: &str) -> Vec<(&'static str, tauri::window::Effect)> {
     use tauri::window::Effect;
     let forced = std::env::var("LANPIPE_BACKDROP").unwrap_or_default();
@@ -591,7 +610,7 @@ fn backdrop_candidates(theme: &str) -> Vec<(&'static str, tauri::window::Effect)
         "acrylic" => return vec![("acrylic", Effect::Acrylic)],
         _ => {}
     }
-    let build = windows_version::OsVersion::current().build;
+    let build = os_build();
     log(&format!("backdrop: os build {build}, theme {theme}"));
     if build >= 22000 {
         vec![("mica", mica_effect(theme)), ("acrylic", Effect::Acrylic)]
@@ -628,9 +647,23 @@ fn apply_backdrop(window: &tauri::WebviewWindow, theme: &str) -> &'static str {
         log("backdrop: no material, use solid background");
     }
     let _ = window;
+    let _ = theme;
     "none"
 }
 
+/// 系统 build 号（Windows 用于判断 Mica/圆角能力）；非 Windows 返回 0。
+fn os_build() -> u64 {
+    #[cfg(windows)]
+    {
+        windows_version::OsVersion::current().build as u64
+    }
+    #[cfg(not(windows))]
+    {
+        0
+    }
+}
+
+#[cfg(windows)]
 #[repr(C)]
 struct DwmMargins {
     cx_left_width: i32,
@@ -639,6 +672,7 @@ struct DwmMargins {
     cy_bottom_height: i32,
 }
 
+#[cfg(windows)]
 #[link(name = "user32")]
 extern "system" {
     fn GetWindowLongPtrW(hwnd: isize, index: i32) -> isize;
@@ -656,6 +690,7 @@ extern "system" {
     ) -> i32;
 }
 
+#[cfg(windows)]
 #[link(name = "dwmapi")]
 extern "system" {
     fn DwmExtendFrameIntoClientArea(hwnd: isize, margins: *const DwmMargins) -> i32;
@@ -669,6 +704,7 @@ extern "system" {
 }
 
 /// 调窗口外框：去掉无边框窗口那圈生硬的 1px 黑边（保留柔和阴影），Win11 用圆角。
+#[cfg(windows)]
 fn tune_window_frame(window: &tauri::WebviewWindow) {
     const DWMWA_BORDER_COLOR: u32 = 34;
     const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
@@ -706,7 +742,7 @@ fn tune_window_frame(window: &tauri::WebviewWindow) {
     // Win11：DWM 只对"带标准 resize frame"的窗口做圆角与投影。
     // 自绘标题栏窗口默认是 WS_POPUP，需补回 WS_THICKFRAME（不补 WS_CAPTION），
     // 否则圆角/阴影都不生效，且会出现无过渡的灰边。
-    if windows_version::OsVersion::current().build >= 22000 {
+    if os_build() >= 22000 {
         const GWL_STYLE: i32 = -16;
         const WS_THICKFRAME: isize = 0x0004_0000;
         const SWP_NOSIZE: u32 = 0x0001;
@@ -730,6 +766,11 @@ fn tune_window_frame(window: &tauri::WebviewWindow) {
             }
         }
     }
+}
+
+#[cfg(not(windows))]
+fn tune_window_frame(_window: &tauri::WebviewWindow) {
+    // 非 Windows 平台没有 DWM 边框/圆角，由系统窗口管理器处理。
 }
 
 /// 防火墙规则是否已写入（程序 + UDP + TCP 三条）。
@@ -778,7 +819,7 @@ async fn check_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, Strin
 /// 当前环境是否使用系统窗口阴影（Win11 为 true）。
 #[tauri::command]
 fn window_shadow() -> bool {
-    windows_version::OsVersion::current().build >= 22000
+    os_build() >= 22000
 }
 
 /// 前端启动后读取，用于启用半透明层级样式。

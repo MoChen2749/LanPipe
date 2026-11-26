@@ -47,3 +47,6 @@ __pycache__/
 # æ–‡æ¡£è°ƒè¯•å›¾ï¼ˆä¿ç•™ docs/screenshotsã€docs/uiï¼‰
 docs/_*.png
 docs/tmp/
+
+# Linux ¹¹½¨²úÎï
+/dist-linux/

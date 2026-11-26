@@ -54,3 +54,51 @@ jobs:
 
       - name: 构建 release（Windows 桌面）
         run: cargo build --release --features custom-protocol -p lanpipe
+
+  linux:
+    name: Linux 构建检查
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 缓存
+        uses: swatinem/rust-cache@v2
+        with:
+          key: linux
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file pkg-config libssl-dev \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev \
+            libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+
+      - name: 检查构建依赖
+        run: bash tools/build-linux.sh deps
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 构建前端
+        run: npm run build
+
+      - name: 构建 Linux CLI
+        run: bash tools/build-linux.sh cli
+
+      - name: cargo test
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
+        run: cargo test --workspace --all-targets
+
+      - name: 构建 Linux 桌面
+        run: bash tools/build-linux.sh desktop
+

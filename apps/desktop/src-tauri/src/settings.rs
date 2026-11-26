@@ -220,11 +220,21 @@ fn init_config(app: &AppHandle, path: &Path, port_offset: u16) -> Result<AppConf
 }
 
 fn default_download_dir(app: &AppHandle) -> Result<String, String> {
-    let downloads = app
-        .path()
-        .download_dir()
-        .map_err(|err| format!("获取下载目录失败: {err}"))?;
-    Ok(downloads.join("LanPipe").to_string_lossy().to_string())
+    if let Ok(downloads) = app.path().download_dir() {
+        return Ok(downloads.join("LanPipe").to_string_lossy().to_string());
+    }
+    // 部分 Linux 环境（没有 XDG 用户目录、以 root 运行等）拿不到系统下载目录，
+    // 退回 $HOME/Downloads（不存在则 $HOME），避免首次启动因配置失败无法工作。
+    if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+        let base = std::path::PathBuf::from(home);
+        let dir = if base.join("Downloads").is_dir() {
+            base.join("Downloads")
+        } else {
+            base
+        };
+        return Ok(dir.join("LanPipe").to_string_lossy().to_string());
+    }
+    Err("获取下载目录失败: 没有可用的用户目录".into())
 }
 
 fn normalize(config: &mut AppConfig) {

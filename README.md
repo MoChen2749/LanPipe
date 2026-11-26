@@ -7,7 +7,7 @@
 
 LanPipe 是一款面向可信局域网的批量文件直传工具：把文件或目录拖入窗口、选择目标设备即可开始传输，接收端按文件边收边写，不做整包归档。
 
-当前版本 `0.1.0`。Windows 桌面端是已验证的交付形态，Linux CLI 已在测试中验证；macOS 与 Linux 桌面端尚未验证。
+当前版本 `0.1.0`。Windows 桌面端是已验证的交付形态；Linux CLI 与桌面端（WSLg）已构建并验证中文渲染；macOS 与真实 Linux 桌面尚未验证。
 
 ## 1. 项目定位与适用场景
 
@@ -89,8 +89,8 @@ cargo build --release --features custom-protocol -p lanpipe
 | --- | --- | --- | --- |
 | Windows 10/11 | 桌面 GUI（MSI / 便携 zip） | 已验证（测试环境为 Server 2022） | 本文 §3 |
 | Windows ARM64 | 交叉编译 | 构建脚本支持，运行未验证 | `build.bat` 交叉编译项 |
-| Linux（WSL2 Ubuntu 24.04） | CLI | 已在测试中验证 | [docs/INSTALL.md](docs/INSTALL.md) §2.1 |
-| Linux 桌面 | GUI（deb / AppImage） | 未验证 | [docs/INSTALL.md](docs/INSTALL.md) §2.2 |
+| Linux（WSL2 Ubuntu 24.04） | CLI（静态 / musl） | 已在测试中验证；可从 Windows 交叉编译 | [docs/INSTALL.md](docs/INSTALL.md) §2.1 |
+| Linux 桌面 | GUI（deb；AppImage 构建未验证） | WSLg 中构建、启动、中文渲染已验证 | [docs/INSTALL.md](docs/INSTALL.md) §2.2 |
 | macOS | GUI（app / dmg） | 未验证 | [docs/INSTALL.md](docs/INSTALL.md) §3 |
 | 移动端（Android / iOS） | — | 规划中 | M3 评估项 |
 
@@ -271,6 +271,17 @@ build.bat test              # 代码门禁：cargo test + clippy
 node tools/check-i18n.mjs   # 校验 i18n key 使用情况
 ```
 
+Linux 构建（原生 Linux / WSL / 容器 / CI 通用）：
+
+```bash
+bash tools/build-linux.sh deps      # 检查依赖
+bash tools/build-linux.sh cli       # 静态 CLI -> dist-linux/lanpipe-cli
+bash tools/build-linux.sh desktop   # 桌面程序 -> dist-linux/lanpipe
+BUNDLES=deb bash tools/build-linux.sh bundle   # 安装包
+```
+
+Windows 上可用 `tools/build-linux.ps1`：`-Command cli` 直接交叉编译静态 CLI（rust 自带 lld，不需要 WSL）；`desktop`/`bundle`/`deps` 经 WSL 执行。
+
 
 Windows 上若 `cargo test` 报 MSVC `D8050`（编译 ring 时无法写入调试记录），先设置 `$env:CARGO_PROFILE_DEV_DEBUG=0` 再跑测试；CI 已默认设置该变量。
 
@@ -290,8 +301,8 @@ Windows 上若 `cargo test` 报 MSVC `D8050`（编译 ring 时无法写入调试
 
 ### 10.4 持续集成
 
-- `.github/workflows/ci.yml`：push/PR 到 `master`、`dev` 时跑 i18n 检查、前端构建、`cargo test`、`clippy -D warnings` 与 release 构建。
-- `.github/workflows/release.yml`：推送 `v*` tag 时先校验 tag 与 `tauri.conf.json` 版本一致、两个签名 Secret 存在，再构建 MSI、便携版，签名并生成 `latest.json`，创建 GitHub Release。
+- `.github/workflows/ci.yml`：push/PR 到 `master`、`dev` 时跑 i18n 检查、前端构建、`cargo test`、`clippy -D warnings` 与 release 构建；另有 `linux` 作业在 `ubuntu-24.04` 校验 Linux 依赖、CLI、测试与桌面端构建。
+- `.github/workflows/release.yml`：推送 `v*` tag 时先校验 tag 与 `tauri.conf.json` 版本一致、两个签名 Secret 存在，再构建 MSI、便携版，签名并生成 `latest.json`，创建 GitHub Release；`linux` 作业同时构建 deb 并追加到同一 Release。
 
 ### 10.5 分支与提交
 

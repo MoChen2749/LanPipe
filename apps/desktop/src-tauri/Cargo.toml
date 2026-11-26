@@ -14,7 +14,6 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["unstable", "tray-icon", "image-png"] }
-windows-version = "0.1"
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
@@ -27,3 +26,5 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 
+[target.'cfg(windows)'.dependencies]
+windows-version = "0.1"

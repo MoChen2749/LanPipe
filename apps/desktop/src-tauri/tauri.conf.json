@@ -30,6 +30,13 @@
     "shortDescription": "局域网文件直传",
     "longDescription": "LanPipe 是局域网文件直传工具：自动发现设备、拖入即传、断点续传，数据不经过云端。",
     "licenseFile": "../../../LICENSE",
+    "linux": {
+      "deb": {
+        "depends": [
+          "fonts-noto-cjk"
+        ]
+      }
+    },
     "windows": {
       "nsis": {
         "languages": [
