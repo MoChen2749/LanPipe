@@ -85,6 +85,20 @@ if (process.env.SHOT_CLICK) {
   await sleep(500);
 }
 
+// SHOT_WAIT=<文本>：截图前最多等 10 秒，直到页面出现该文本（用于异步操作结果）。
+if (process.env.SHOT_WAIT) {
+  const want = process.env.SHOT_WAIT;
+  for (let i = 0; i < 40; i += 1) {
+    const expr = `(() => document.body.innerText.includes(${JSON.stringify(want)}))()`;
+    const r = await send(ws, "Runtime.evaluate", { expression: expr, returnByValue: true });
+    if (r.result?.value) {
+      console.log("wait: found", want);
+      break;
+    }
+    await sleep(250);
+  }
+}
+
 if (flag === "--mobile") {
   await send(ws, "Emulation.setDeviceMetricsOverride", {
     width: 390,
