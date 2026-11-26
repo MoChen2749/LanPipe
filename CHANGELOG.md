@@ -6,6 +6,14 @@
 
 暂无。
 
+## [0.1.2] - 2026-11-27
+
+### 变更
+
+- 发行形态调整为单文件二进制优先：Release 只发布 Windows MSI、Windows 独立 exe、Linux 桌面二进制、Linux 静态 CLI 四类资产；不再构建或发布便携 zip、deb、AppImage。
+- Linux 构建脚本新增 `CLI_TARGET`，可在 Linux / CI 内直接产出 musl 静态 CLI；`release.yml` 的 Linux 作业改为构建桌面二进制与静态 CLI 并追加到同一 Release。
+- 文档同步新的发行形态与构建命令（README、`docs/INSTALL.md`、`AGENT.md`）。
+
 ## [0.1.1] - 2026-11-26
 
 ### 新增

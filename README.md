@@ -7,7 +7,7 @@
 
 LanPipe 是一款面向可信局域网的批量文件直传工具：把文件或目录拖入窗口、选择目标设备即可开始传输，接收端按文件边收边写，不做整包归档。
 
-当前版本 `0.1.1`。Windows 桌面端是已验证的交付形态；Linux CLI 与桌面端（WSLg）已构建并验证中文渲染；macOS 与真实 Linux 桌面尚未验证。
+当前版本 `0.1.2`。Windows 桌面端是已验证的交付形态；Linux CLI 与桌面端（WSLg）已构建并验证中文渲染；macOS 与真实 Linux 桌面尚未验证。
 
 ## 1. 项目定位与适用场景
 
@@ -44,23 +44,23 @@ LanPipe 解决的是「两台设备之间搬运大量文件」这一类需求：
 | 直连与短号 | 支持 `IP[:端口]` 直连，也支持 IPv4 末段短号（如 `5`、`005`）扫描定位 |
 | 桌面体验 | 五页导航（发送/接收/历史/诊断/设置）、拖放、窄屏自适应；Mica/Acrylic 材质仅 Windows |
 | 系统集成 | 托盘、开机自启、防火墙一键放行（UAC）、单实例 |
-| 发行形态 | MSI 安装包（中文/英文）与便携 zip；自动更新骨架已接入（更新端点尚未部署） |
+| 发行形态 | Windows：MSI 安装包 + 独立 exe；Linux：桌面与 CLI 单文件二进制；自动更新已接入 GitHub Release |
 
 ## 3. 快速开始
 
 ### 3.1 使用安装包（Windows，推荐）
 
-双击 `LanPipe_0.1.0_x64_zh-CN.msi`（位于 `target\release\bundle\msi\`，或随发行包提供）按向导安装；静默安装（需要管理员权限）：
+双击 `LanPipe_0.1.2_x64_zh-CN.msi`（位于 `target\release\bundle\msi\`，或从 Release 下载）按向导安装；静默安装（需要管理员权限）：
 
 ```powershell
-msiexec /i "LanPipe_0.1.0_x64_zh-CN.msi" /qn
+msiexec /i "LanPipe_0.1.2_x64_zh-CN.msi" /qn
 ```
 
 默认安装到 `C:\Program Files\LanPipe`，同时创建开始菜单快捷方式与卸载项。
 
-### 3.2 使用便携版
+### 3.2 使用独立 exe
 
-解压 `LanPipe_0.1.0_x64-portable.zip`（位于 `target\release\bundle\portable\`），运行其中的 `LanPipe.exe`。配置写入 `%APPDATA%\LanPipe`；移除程序时退出托盘中的进程并删除解压目录即可，配置目录按需清理。
+从 Release 下载 `LanPipe_v0.1.2_x64-windows.exe`，放到任意目录直接运行；需要系统已安装 WebView2 Runtime（Windows 10/11 一般自带）。配置写入 `%APPDATA%\LanPipe`；移除时退出托盘进程并删除该 exe 即可。
 
 ### 3.3 从源码构建（Windows）
 
@@ -87,10 +87,10 @@ cargo build --release --features custom-protocol -p lanpipe
 
 | 平台 | 形态 | 状态 | 入口 |
 | --- | --- | --- | --- |
-| Windows 10/11 | 桌面 GUI（MSI / 便携 zip） | 已验证（测试环境为 Server 2022） | 本文 §3 |
+| Windows 10/11 | 桌面 GUI（MSI / 独立 exe） | 已验证（测试环境为 Server 2022） | 本文 §3 |
 | Windows ARM64 | 交叉编译 | 构建脚本支持，运行未验证 | `build.bat` 交叉编译项 |
 | Linux（WSL2 Ubuntu 24.04） | CLI（静态 / musl） | 已在测试中验证；可从 Windows 交叉编译 | [docs/INSTALL.md](docs/INSTALL.md) §2.1 |
-| Linux 桌面 | GUI（deb；AppImage 构建未验证） | WSLg 中构建、启动、中文渲染已验证 | [docs/INSTALL.md](docs/INSTALL.md) §2.2 |
+| Linux 桌面 | GUI（单文件二进制） | WSLg 中构建、启动、中文渲染已验证 | [docs/INSTALL.md](docs/INSTALL.md) §2.2 |
 | macOS | GUI（app / dmg） | 未验证 | [docs/INSTALL.md](docs/INSTALL.md) §3 |
 | 移动端（Android / iOS） | — | 规划中 | M3 评估项 |
 
@@ -228,8 +228,8 @@ flowchart LR
 - Windows 是唯一完成桌面验证的平台；macOS 与 Linux 桌面端未验证。
 - WebView2 145.x / 154.x 存在窗口透明回归（上游 #5481、#5752），程序会自动回退纯色背景，诊断页显示 WebView2 版本与回退提示。
 - NSIS 安装包静默安装（`/S`）返回 0 但不落盘，当前不作为交付形态（待查）；MSI 为主交付。
-- 自动更新端点指向 GitHub Release：`https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json`。首个 Release（`v0.1.0`）发布后即可真实检查更新；升级安装链路待下一版本验证。
-- 目前只发布 x64 MSI 与便携 zip。
+- 自动更新端点指向 GitHub Release：`https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json`；`v0.1.0 → v0.1.1` 的检测与覆盖安装已验证。
+- 目前 Release 提供：x64 MSI、x64 独立 exe、Linux 桌面二进制、Linux 静态 CLI。
 
 ## 9. 文档索引
 
@@ -266,7 +266,7 @@ cargo build --release --features custom-protocol -p lanpipe
 cargo test                  # 工作区全部测试
 cargo test -p lanpipe-net   # 协议与传输端到端测试
 cargo clippy --workspace --all-targets -- -D warnings
-build.bat package           # 打包 MSI + 便携 zip（含 SHA256 汇总）
+build.bat package           # 本地打包 MSI（含 SHA256 汇总）
 build.bat test              # 代码门禁：cargo test + clippy
 node tools/check-i18n.mjs   # 校验 i18n key 使用情况
 ```
@@ -277,7 +277,7 @@ Linux 构建（原生 Linux / WSL / 容器 / CI 通用）：
 bash tools/build-linux.sh deps      # 检查依赖
 bash tools/build-linux.sh cli       # 静态 CLI -> dist-linux/lanpipe-cli
 bash tools/build-linux.sh desktop   # 桌面程序 -> dist-linux/lanpipe
-BUNDLES=deb bash tools/build-linux.sh bundle   # 安装包
+bash tools/build-linux.sh desktop   # 桌面二进制 -> dist-linux/lanpipe
 ```
 
 Windows 上可用 `tools/build-linux.ps1`：`-Command cli` 直接交叉编译静态 CLI（rust 自带 lld，不需要 WSL）；`desktop`/`bundle`/`deps` 经 WSL 执行。
@@ -293,16 +293,16 @@ Windows 上若 `cargo test` 报 MSVC `D8050`（编译 ring 时无法写入调试
 - 同机双实例自测：`--instance b`，配置目录为 `%APPDATA%\LanPipe-b`；首次生成配置时 TCP 端口整体 +10，UDP 不变。
 - 界面截图：以 `LANPIPE_CDP=9333` 启动应用，再运行 `node tools/ui-shot.mjs 9333 shot.png [navIndex]`（`navIndex` 0–4 对应发送、接收、历史、诊断、设置；`--tall` 截整页、`--mobile` 截 390×844）。
 - 材质调试：`LANPIPE_BACKDROP=mica|acrylic|none`、`LANPIPE_TRANSPARENCY=force`。
-- 一条命令打包：`build.bat package`（= `tools/package.ps1`，顺序：前端构建 → MSI → 便携 zip → 打印路径/大小/SHA256）。
+- 一条命令打包：`build.bat package`（= `tools/package.ps1`，顺序：前端构建 → MSI → 打印路径/大小/SHA256；仅供本地验证）。
 - 打包并生成更新清单：`build.bat package publish`（需先设置 `LANPIPE_RELEASE_URL`，额外调用 `tools/publish-release.ps1` 生成 `latest.json`）。
-- 单独打包：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1 -Bundles msi,portable`（`-SkipFrontend` 跳过前端构建；`-OutDir` 指定输出目录）。
+- 单独打包：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1 -Bundles msi`（`-SkipFrontend` 跳过前端构建；`-OutDir` 指定输出目录）。
 - 首次打包会自动下载 WiX 到 `%LOCALAPPDATA%\tauri`；cargo 需在 PATH 中（`%USERPROFILE%\.cargo\bin`）。
 - 发布：`tools/publish-release.ps1` 生成 `.sig` 与 `latest.json`，签名密钥由 `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 提供。
 
 ### 10.4 持续集成
 
 - `.github/workflows/ci.yml`：push/PR 到 `master`、`dev` 时跑 i18n 检查、前端构建、`cargo test`、`clippy -D warnings` 与 release 构建；另有 `linux` 作业在 `ubuntu-24.04` 校验 Linux 依赖、CLI、测试与桌面端构建。
-- `.github/workflows/release.yml`：推送 `v*` tag 时先校验 tag 与 `tauri.conf.json` 版本一致、两个签名 Secret 存在，再构建 MSI、便携版，签名并生成 `latest.json`，创建 GitHub Release；`linux` 作业同时构建 deb 并追加到同一 Release。
+- `.github/workflows/release.yml`：推送 `v*` tag 时先校验 tag 与 `tauri.conf.json` 版本一致、两个签名 Secret 存在，再构建 MSI 与独立 exe、签名并生成 `latest.json`，创建 GitHub Release；`linux` 作业同时构建桌面二进制与静态 CLI 并追加到同一 Release。
 
 ### 10.5 分支与提交
 

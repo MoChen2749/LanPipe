@@ -679,13 +679,13 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 
 ### 16.11 M3 打包与分发（2026-11-22）
 
-**打包入口**：`build.bat package` / `build.bat package publish`，内部调用 `tools/package.ps1`（前端构建 → MSI → 便携 zip → 汇总路径/大小/SHA256；`-Publish -Url` 时再生成 `latest.json`）。单独使用：`powershell -File tools/package.ps1 -Bundles msi,portable [-SkipFrontend] [-OutDir <dir>]`。
+**打包入口**：`build.bat package` / `build.bat package publish`，内部调用 `tools/package.ps1`（前端构建 → MSI → 汇总路径/大小/SHA256；仅供本地验证；`-Publish -Url` 时再生成 `latest.json`）。单独使用：`powershell -File tools/package.ps1 -Bundles msi [-SkipFrontend] [-OutDir <dir>]`。
 
-- **MSI（主交付）**：`bundle.targets = ["msi"]`、`bundle.windows.wix.language = ["zh-CN"]`，产物 `target/release/bundle/msi/LanPipe_0.1.0_x64_zh-CN.msi`（约 2.9 MB）。
+- **MSI（主交付）**：`bundle.targets = ["msi"]`、`bundle.windows.wix.language = ["zh-CN"]`，产物 `target/release/bundle/msi/LanPipe_0.1.2_x64_zh-CN.msi`（约 4.0 MB）。
   - 安装位置 `C:\Program Files\LanPipe`（perMachine，需要管理员），带卸载快捷方式与「应用和功能」条目；
   - 版本信息来自 `tauri.conf.json` 的 `version` + `bundle.publisher/copyright/shortDescription/longDescription/licenseFile`；
   - 实测：`msiexec /i ... /qn` → 安装成功、`lanpipe.exe` 可运行、`msiexec /x {ProductCode} /qn` → 卸载干净。
-- **便携版**：`tools/make-portable.ps1`（UTF-8 **带 BOM**，否则 Windows PowerShell 5.1 会因中文把字符串解析坏）→ `target/release/bundle/portable/LanPipe_0.1.0_x64-portable.zip`（exe + LICENSE + 使用说明）。
+- **独立 exe**：`target/release/lanpipe.exe` 复制为 `LanPipe_vX.Y.Z_x64-windows.exe` 直接分发（需 WebView2 Runtime），不再打便携 zip。
 - **NSIS（per-user）**：配置保留（`installMode=currentUser`、简中/英文、installerIcon、startMenuFolder），但本机 `setup.exe /S` 返回 0 且不落盘（临时目录改为可写目录后才不报 NSIS Error），暂不作为交付；待查 Tauri NSIS 静默模式的 abort 原因。
 - 打包注意：先 `npm run build` 再 `npx tauri build`；`cargo` 需在 PATH；首次打包下载 WiX/NSIS 到 `%LOCALAPPDATA%\tauri`。
 
@@ -700,19 +700,19 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
   - 正式发布换新密钥，CI 里用 `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`；
   - `tools/publish-release.ps1` 调 `tauri signer sign` 生成 `.sig` 并写 `latest.json`。
 - 端到端（本地）：改版本（`tauri.conf.json` + workspace `Cargo.toml`）→ `npm run build` → `npx tauri build --bundles msi` → `tools/publish-release.ps1 -Installer ... -Version ... -Url ...` → 上传 MSI 与 `latest.json`。
-- 端到端（CI，推荐）：`git tag vX.Y.Z && git push origin vX.Y.Z` → `.github/workflows/release.yml` 校验 tag 与 `tauri.conf.json` 版本一致、校验两个 Secret 存在 → 构建 MSI（zh-CN）+ 便携 zip → 签名生成 `.msi.sig` 与 `latest.json`（UTF-8 **无 BOM**）→ 创建 GitHub Release 并上传四个产物。
+- 端到端（CI，推荐）：`git tag vX.Y.Z && git push origin vX.Y.Z` → `.github/workflows/release.yml` 校验 tag 与 `tauri.conf.json` 版本一致、校验两个 Secret 存在 → Windows 构建 MSI（zh-CN）与独立 exe，签名生成 `.msi.sig` 与 `latest.json`（UTF-8 **无 BOM**）；Linux 构建桌面二进制与静态 CLI → 创建 GitHub Release 上传六项资产（msi、msi.sig、exe、latest.json、桌面二进制、CLI）。
 - `plugins.updater.endpoints` = `https://github.com/MoChen2749/LanPipe/releases/latest/download/latest.json`（GitHub Release 的永久最新地址），`windows.installMode = passive`。
 - `tools/publish-release.ps1` 已支持 CI：私钥文件不存在时从环境变量 `TAURI_SIGNING_PRIVATE_KEY` 读取内容写临时文件，并在调用 `tauri signer sign` 前临时清除该变量（signer 不允许 `--private-key` 与 `--private-key-path` 同时出现）；`latest.json` 用 `WriteAllText` + 无 BOM UTF8 写出（serde_json 不接受 BOM）。
-- 当前状态（2026-11-26）：`v0.1.0`、`v0.1.1` 均已发布。`v0.1.1` Release 含 `LanPipe_0.1.1_x64_zh-CN.msi`、`.msi.sig`、`LanPipe_0.1.1_x64-portable.zip`、`latest.json`、`LanPipe_0.1.1_amd64.deb`（Linux 作业构建并追加）；`latest.json` 返回 200 且无 BOM。
+- 当前状态（2026-11-27）：`v0.1.0`、`v0.1.1`、`v0.1.2` 均已发布。从 v0.1.2 起发行形态改为单文件二进制优先：Release 只含 `LanPipe_<ver>_x64_zh-CN.msi`、`.msi.sig`、`LanPipe_<ver>_x64-windows.exe`、`latest.json`、`LanPipe_<ver>_x86_64-linux`、`lanpipe-cli_<ver>_x86_64-linux`；不再产出便携 zip、deb、AppImage（`latest.json` 仍指向 MSI，自动更新「检查更新」依赖它）。
 - 升级链路实测（2026-11-26）：安装 `v0.1.0` → 「检查更新」显示「发现新版本 0.1.1」（`docs/screenshots/update-found.png`）；覆盖安装 `v0.1.1` MSI 后 `ProductVersion=0.1.1`、界面显示「版本 0.1.1」且「检查更新」为「已是最新版本」（`docs/screenshots/update-upgraded.png`）。当前 UI 只做检测与提示，不下发下载/自动安装（tauri-plugin-updater 的 download/install 未接）。
 - 发布工作流踩坑：Windows PowerShell 5.1 的 `Get-Content` 默认按 ANSI 读文件，`tauri.conf.json` 含中文时 `ConvertFrom-Json` 会失败，必须加 `-Encoding UTF8`；`tauri signer sign` 不允许同时给 `--private-key` 与 `--private-key-path`。
 - 待做：自动下载并静默安装更新（`updater.download`/`install` + 重启）、正式签名密钥替换、MSI 代码签名。
-- 版本节奏：`0.1.0`（2026-11-26 首发，Windows MSI/便携/自动更新）；`0.1.1` 增加 Linux 构建与 deb 发布（Release 产物含 `LanPipe_0.1.1_amd64.deb`）。
+- 版本节奏：`0.1.0`（2026-11-26 首发，Windows MSI/自动更新）；`0.1.1` 增加 Linux 构建与 deb 发布；`0.1.2` 发行形态改为 MSI + 独立 exe + Linux 桌面/CLI 单文件二进制。
 
 ### 16.13 Linux 多端构建与平台隔离（2026-11-26）
 
 **构建脚本**
-- `tools/build-linux.sh`：Linux 原生 / WSL / 容器 / CI 通用。命令 `deps | cli | desktop | bundle | all | clean`；环境变量 `SKIP_FRONTEND=1`、`BUNDLES=deb,appimage`（默认）。`deps` 检查 `cc/pkg-config/cargo/rustc` + `gtk+-3.0`、`webkit2gtk-4.1`、`javascriptcoregtk-4.1`、`libsoup-3.0`、`ayatana-appindicator3-0.1`、`librsvg-2.0` + `patchelf/file/dpkg-deb`，缺依赖时打印 Debian/Fedora/Arch 安装命令。`desktop` 产物 `dist-linux/lanpipe`，`bundle` 产物在 `target/release/bundle/` 并复制到 `dist-linux/`。
+- `tools/build-linux.sh`：Linux 原生 / WSL / 容器 / CI 通用。命令 `deps | cli | desktop | bundle | all | clean`；环境变量 `SKIP_FRONTEND=1`、`BUNDLES=deb,appimage`（默认）、`CLI_TARGET=<triple>`（设置后按指定 triple 构建静态 CLI，供 CI 用 musl 产出单文件）。`deps` 检查 `cc/pkg-config/cargo/rustc` + `gtk+-3.0`、`webkit2gtk-4.1`、`javascriptcoregtk-4.1`、`libsoup-3.0`、`ayatana-appindicator3-0.1`、`librsvg-2.0` + `patchelf/file/dpkg-deb`，缺依赖时打印 Debian/Fedora/Arch 安装命令。`desktop` 产物 `dist-linux/lanpipe`；`bundle` 仅本地验证用（发行不再产出 deb/AppImage）。
 - `tools/build-linux.ps1`（Windows 入口，UTF-8 **带 BOM**）：`-Command cli|desktop|bundle|deps`、`-Distro <WSL 发行版>`。
   - `cli` 不需要 WSL：`rustup target add x86_64-unknown-linux-musl`，用 rust 自带 `rust-lld`（`<sysroot>/lib/rustlib/x86_64-pc-windows-msvc/bin/rust-lld.exe`）配 `CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=<rust-lld>`、`RUSTFLAGS="-C link-self-contained=yes -C linker-flavor=ld.lld"` 交叉编译，产物静态 ELF（约 1.0 MB），校验 ELF 魔数并打印 size/sha256。
   - `desktop/bundle/deps` 经 `wsl.exe -d <Distro> -u root -- bash -lc` 调用 `build-linux.sh`，路径转 `/mnt/<drive>/...`。
@@ -727,7 +727,7 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 **验证结果**
 - Windows：`cargo check -p lanpipe` 通过；
 - Linux：WSL2 Ubuntu 24.04 内 `SKIP_FRONTEND=1 bash tools/build-linux.sh desktop` 4m19s 通过，`dist-linux/lanpipe` 8.5 MB，WSLg 中启动成功（settings/net/window/tray/page_load 全 OK），`docs/screenshots/linux-wslg.png` 为中文正常渲染的截图；
-- deb：`LanPipe_0.1.0_amd64.deb` 构建成功；AppImage 因下载 `AppRun`/`linuxdeploy` 失败未验证。
+- deb：`LanPipe_0.1.0_amd64.deb` 曾在 v0.1.1 构建并发布；v0.1.2 起不再产出 deb/AppImage，Linux 只发布单文件二进制（AppImage 因下载 `AppRun`/`linuxdeploy` 失败从未验证）。
 - 截图方法（WSL 无 X 抓图能力时）：`Xvfb :99 -screen 0 1100x820x24 -extension GLX`，应用以 `setsid env DISPLAY=:99 GDK_BACKEND=x11 WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_GL=disable LIBGL_ALWAYS_SOFTWARE=1 ./dist-linux/lanpipe` 启动，再 `DISPLAY=:99 import -window root shot.png`；WSLg 直接抓 `:0` 会报 `Resource temporarily unavailable`。注意 bash 里 `"$@"` 必须放在 `env` 之后，写成命令前缀会导致 `command not found`。
-- CI：`ci.yml` 的 `linux` 作业（ubuntu-24.04）跑 deps、cli、`cargo test`、desktop 构建；`release.yml` 的 `linux` 作业（ubuntu-24.04）用 `BUNDLES=deb` 构建 deb、校验依赖含 `fonts-noto-cjk`，再用 `softprops/action-gh-release` 追加到同一 Release。
+- CI：`ci.yml` 的 `linux` 作业（ubuntu-24.04）跑 deps、cli、`cargo test`、desktop 构建；`release.yml` 的 `linux` 作业（ubuntu-24.04）用 `CLI_TARGET=x86_64-unknown-linux-musl` 构建静态 CLI 与桌面二进制，复制为 `LanPipe_<tag>_x86_64-linux`、`lanpipe-cli_<tag>_x86_64-linux` 后追加到同一 Release，不再构建 deb。
 - 已知限制：WSL2 的 `wslrelay.exe` 占用 `127.0.0.1:53311`，本机测桌面接收端要用 LAN IP；Linux 桌面窗口为普通 GTK 外观，无 Mica/Acrylic。

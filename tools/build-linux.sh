@@ -12,6 +12,7 @@
 # 环境变量:
 #   SKIP_FRONTEND=1   跳过 npm 构建（dist/ 已存在时可用）
 #   BUNDLES=deb       指定安装包类型（默认 deb,appimage）
+#   CLI_TARGET=x86_64-unknown-linux-musl  生成静态 CLI（需要 rustup target add）
 
 set -Eeuo pipefail
 
@@ -21,6 +22,7 @@ cd "$ROOT"
 OUT="$ROOT/dist-linux"
 BUNDLES="${BUNDLES:-deb,appimage}"
 SKIP_FRONTEND="${SKIP_FRONTEND:-0}"
+CLI_TARGET="${CLI_TARGET:-}"
 
 APT_DEPS=(
   build-essential curl wget file pkg-config
@@ -111,9 +113,15 @@ build_frontend() {
 
 build_cli() {
   say "构建 CLI"
-  cargo build -p lanpipe-cli --release
+  if [ -n "$CLI_TARGET" ]; then
+    cargo build -p lanpipe-cli --release --target "$CLI_TARGET"
+    CLI_BIN="$ROOT/target/$CLI_TARGET/release/lanpipe-cli"
+  else
+    cargo build -p lanpipe-cli --release
+    CLI_BIN="$ROOT/target/release/lanpipe-cli"
+  fi
   mkdir -p "$OUT"
-  install -m 0755 "$ROOT/target/release/lanpipe-cli" "$OUT/lanpipe-cli"
+  install -m 0755 "$CLI_BIN" "$OUT/lanpipe-cli"
   file "$OUT/lanpipe-cli"
   ls -l "$OUT/lanpipe-cli"
 }

@@ -1,15 +1,15 @@
 # LanPipe 安装与部署指南
 
-适用版本：`0.1.1`。最后更新：2026-11-26。
+适用版本：`0.1.2`。最后更新：2026-11-27。
 
 本指南覆盖三类目标：
 
 | 目标 | 状态 |
 | --- | --- |
-| Windows 桌面端（MSI / 便携版 / 源码构建） | 已验证 |
+| Windows 桌面端（MSI / 独立 exe / 源码构建） | 已验证 |
 | Linux CLI（WSL2 Ubuntu 24.04） | 已在测试中验证 |
 | Linux 桌面端（WSL2 Ubuntu 24.04 + WSLg） | 已构建并启动，中文显示正常 |
-| Linux AppImage、原生 Linux 桌面、macOS | 未验证，仅提供构建路径 |
+| 原生 Linux 桌面、macOS | 未验证，仅提供构建路径 |
 
 通用前置说明：
 
@@ -30,14 +30,14 @@
 构建产物的 MSI 位于仓库根目录 `target/release/bundle/msi/`，提供中文与英文两个安装包：
 
 ```text
-LanPipe_0.1.0_x64_zh-CN.msi
-LanPipe_0.1.0_x64_en-US.msi
+LanPipe_0.1.2_x64_zh-CN.msi
+LanPipe_0.1.2_x64_en-US.msi
 ```
 
 双击按向导安装。静默安装（管理员 PowerShell 或命令提示符）：
 
 ```powershell
-msiexec /i "LanPipe_0.1.0_x64_zh-CN.msi" /qn
+msiexec /i "LanPipe_0.1.2_x64_zh-CN.msi" /qn
 ```
 
 安装结果：
@@ -57,13 +57,13 @@ msiexec /x $product.PSChildName /qn
 
 卸载会移除安装目录与快捷方式。用户配置（`%APPDATA%\LanPipe`）、状态目录与接收到的文件属于用户数据，不会被自动删除，需要时手动清理。
 
-### 1.3 便携版
+### 1.3 独立 exe
 
-`target/release/bundle/portable/LanPipe_0.1.0_x64-portable.zip` 解压即用，无需安装、无需管理员权限。
+从 Release 下载 `LanPipe_v0.1.2_x64-windows.exe`，无需安装、无需管理员权限，放到任意目录运行即可。
 
-- 运行解压目录中的 `LanPipe.exe`；
+- 运行该 exe；需要系统已装 WebView2 Runtime；
 - 配置优先写入 `%APPDATA%\LanPipe\config.json`；该位置不可写时（受限权限、便携场景）回退到 exe 同目录的 `config.json`；
-- 移除方式：从托盘菜单退出程序、关闭开机自启，然后删除解压目录；按需删除 `%APPDATA%\LanPipe`。
+- 移除方式：从托盘菜单退出程序、关闭开机自启，然后删除该 exe；按需删除 `%APPDATA%\LanPipe`。
 
 ### 1.4 防火墙配置
 
@@ -100,7 +100,7 @@ Get-NetFirewallRule -DisplayName 'LanPipe*' | Format-Table Name, Enabled, Direct
 
 ### 1.5 已验证与待查项
 
-- 已验证：MSI 安装、静默安装（`msiexec /i ... /qn`）、静默卸载、开始菜单与卸载项、便携版启动。
+- 已验证：MSI 安装、静默安装（`msiexec /i ... /qn`）、静默卸载、开始菜单与卸载项、独立 exe 启动。
 - 待查：NSIS 安装包（`LanPipe_0.1.0_x64-setup.exe`）静默安装 `/S` 返回 0 但未写入文件，当前不作为交付形态。请使用 MSI。
 
 ### 1.6 运行数据位置
@@ -118,86 +118,72 @@ Get-NetFirewallRule -DisplayName 'LanPipe*' | Format-Table Name, Enabled, Direct
 
 ## 2. Linux
 
+Linux 版提供两个**单文件二进制**（不提供 deb/AppImage 安装包）：桌面端 `LanPipe_vX.Y.Z_x86_64-linux` 与静态 CLI `lanpipe-cli_vX.Y.Z_x86_64-linux`，均从 Release 下载。
+
 构建脚本：`tools/build-linux.sh`（原生 Linux、WSL、容器、CI 通用）。
 
 ```bash
 bash tools/build-linux.sh deps      # 检查工具链与系统库
 bash tools/build-linux.sh cli       # 静态 CLI -> dist-linux/lanpipe-cli
-bash tools/build-linux.sh desktop   # 桌面程序 -> dist-linux/lanpipe
-bash tools/build-linux.sh bundle    # 安装包 -> target/release/bundle/
-BUNDLES=deb bash tools/build-linux.sh bundle
+bash tools/build-linux.sh desktop   # 桌面二进制 -> dist-linux/lanpipe
 ```
 
-在 Windows 上可用 `tools/build-linux.ps1`：`cli` 直接交叉编译出 Linux 静态二进制（rust 自带 lld，不需要 WSL），`desktop`/`bundle`/`deps` 通过 WSL 执行。
+在 Windows 上可用 `tools/build-linux.ps1`：`cli` 直接交叉编译静态 CLI（rust 自带 lld，不需要 WSL）；`desktop`/`deps` 通过 WSL 执行。
 
 ```powershell
 powershell -File tools/build-linux.ps1 -Command cli
-powershell -File tools/build-linux.ps1 -Command bundle -Distro lanpipe-build
+powershell -File tools/build-linux.ps1 -Command desktop -Distro lanpipe-build
 ```
 
 ### 2.1 命令行版
 
-适用于服务器、WSL 与脚本化传输。依赖 Rust stable 与 C 工具链：
+静态二进制，可直接拷到任意 x86-64 Linux（musl，无 glibc 版本要求）：
 
 ```bash
-sudo apt update
+chmod +x lanpipe-cli_v0.1.2_x86_64-linux
+./lanpipe-cli_v0.1.2_x86_64-linux recv --dest /data/inbox --name build-node
+./lanpipe-cli_v0.1.2_x86_64-linux send 192.168.1.5:53311 /data/out --streams 4
+```
+
+从源码构建：
+
+```bash
 sudo apt install -y build-essential curl
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-构建（二选一）：
-
-```bash
-cargo build --release -p lanpipe-cli
-bash tools/build-linux.sh cli
-```
-
-产物为 `target/release/lanpipe-cli` 或 `dist-linux/lanpipe-cli`，可复制到 `PATH` 目录。使用方式：
-
-```bash
-# 接收端
-./target/release/lanpipe-cli recv --dest /data/inbox --name build-node
-
-# 发送端
-./target/release/lanpipe-cli send 192.168.1.5:53311 /data/out --streams 4
+rustup target add x86_64-unknown-linux-musl
+CLI_TARGET=x86_64-unknown-linux-musl bash tools/build-linux.sh cli
 ```
 
 - 接收端会在标准输出打印 `READY`、`PEER-UP`、`RECEIVED` 等事件行，便于脚本解析。
 - 状态目录优先级：`LANPIPE_STATE_DIR` → `$XDG_STATE_HOME/lanpipe` → `~/.local/state/lanpipe`。
-- 已验证环境为 WSL2 Ubuntu 24.04（NAT 网络）；原生 Linux 发行版未单独验证。
 - 防火墙：若启用了 ufw/firewalld，需要放行 UDP 53310 与 TCP 53311 入站。
-- 静态二进制可直接拷到任意 x86-64 Linux（musl，无 glibc 版本要求）。
 
 ### 2.2 桌面版
 
-系统依赖：
+发布形态为单文件二进制，运行时依赖系统的 GTK3 / WebKitGTK 4.1 等库（与 Tauri 应用一致）：
 
 ```bash
-sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
-  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
-  libjavascriptcoregtk-4.1-dev libsoup-3.0-dev patchelf
+sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 librsvg2-2
+chmod +x LanPipe_v0.1.2_x86_64-linux
+./LanPipe_v0.1.2_x86_64-linux
 ```
 
-较旧发行版若没有 `libwebkit2gtk-4.1-dev`，改用 `libwebkit2gtk-4.0-dev`；使用 `libappindicator3-dev` 的系统可替换 `libayatana-appindicator3-dev`。
+若界面中文显示为方块，安装中文字体：`sudo apt install fonts-noto-cjk`。
 
-构建：
+从源码构建：
 
 ```bash
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libjavascriptcoregtk-4.1-dev \
+  libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
 npm ci
-bash tools/build-linux.sh bundle            # deb + AppImage
-BUNDLES=deb bash tools/build-linux.sh bundle  # 仅 deb
+bash tools/build-linux.sh desktop
 ```
 
 注意：
 
-- `tauri.conf.json` 的 `bundle.targets` 只声明 `msi`（Windows），Linux 上用 `--bundles` 覆盖，构建脚本已处理；
-- deb 产物依赖里带 `fonts-noto-cjk`，避免缺中文字体时界面显示方块；其他发行版如无中文字形请手动安装 `Noto Sans CJK`；
-- 已验证：WSL2 Ubuntu 24.04 下构建成功并在 WSLg 中启动，中文渲染正常（`docs/screenshots/linux-wslg.png`）。原生 Linux 桌面与 AppImage 未验证；
-- 材质：Mica/Acrylic 为 Windows 实现，Linux 走普通 GTK 窗口。
-
-### 2.3 测试 Linux 版时的网络注意
-
-WSL2 的 localhost 转发（`wslrelay.exe`）会占用 `127.0.0.1:53311`，Windows 上测桌面端接收时请用本机 LAN IP，不要用 `127.0.0.1`。
+- 已验证：WSL2 Ubuntu 24.04 下构建成功并在 WSLg 中启动，中文渲染正常（`docs/screenshots/linux-wslg.png`）；原生 Linux 桌面机未验证；
+- 材质：Mica/Acrylic 为 Windows 实现，Linux 走普通 GTK 窗口；
+- 二进制不会自动注册桌面项、托盘图标依赖桌面环境的 AppIndicator 支持。
 
 ## 3. macOS（未验证）
 
@@ -262,7 +248,7 @@ node tools/check-i18n.mjs
 
 ### 4.4 生成发行物
 
-MSI（Windows）：
+Windows MSI：
 
 ```powershell
 npm run build
@@ -272,18 +258,21 @@ npx tauri build --bundles msi
 
 产物在仓库根目录的 `target/release/bundle/msi/`。首次构建会自动下载 WiX 工具链。
 
-便携 zip：
+Windows 独立 exe：
 
 ```powershell
 cargo build --release --features custom-protocol -p lanpipe
-pwsh -ExecutionPolicy Bypass -File tools/make-portable.ps1
+Copy-Item target\release\lanpipe.exe "target\release\artifacts\LanPipe_vX.Y.Z_x64-windows.exe"
 ```
 
-该脚本以 `pwsh`（PowerShell 7）执行，Windows 自带的是 `powershell.exe`，需先安装 PowerShell 7。
+Linux 二进制（原生 Linux，或在 Windows 上经 `tools/build-linux.ps1` 走 WSL）：
 
-输出 `target/release/bundle/portable/LanPipe_0.1.0_x64-portable.zip`。
+```bash
+bash tools/build-linux.sh desktop        # 桌面端 -> dist-linux/lanpipe
+CLI_TARGET=x86_64-unknown-linux-musl bash tools/build-linux.sh cli   # 静态 CLI
+```
 
-自动更新签名与发布：`tools/publish-release.ps1` 生成 `.sig` 与 `latest.json`，签名私钥通过 `TAURI_SIGNING_PRIVATE_KEY` 与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 提供。当前更新端点为占位地址，正式发布前必须替换。
+上述产物由 `.github/workflows/release.yml` 在推送 `v*` tag 时自动构建并上传 Release。自动更新签名与发布：`tools/publish-release.ps1` 生成 `.sig` 与 `latest.json`，签名私钥通过 `TAURI_SIGNING_PRIVATE_KEY` 与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 提供；更新端点为仓库 Release 的 `latest.json`。
 
 ## 5. 常见问题（FAQ）
 
@@ -382,7 +371,7 @@ Get-Content "$env:TEMP\LanPipe\lanpipe.log" -Tail 200
 | 项目 | 状态 |
 | --- | --- |
 | Windows MSI 安装/静默安装/卸载 | 已验证 |
-| Windows 便携版 | 已验证 |
+| Windows 独立 exe | 已验证 |
 | Windows 防火墙一键放行 | 已验证（`profile=any`） |
 | 25 GB / 43,594 文件传输（Windows ↔ WSL2） | 已验证 |
 | Linux CLI 构建与传输 | 已在 WSL2 Ubuntu 24.04 验证 |
