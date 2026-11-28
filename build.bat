@@ -37,7 +37,7 @@ echo   3. Run Release build (auto-deploy to LOCALAPPDATA\Programs\LanPipe)
 echo   4. Run in dev mode (Vite + cargo run)
 echo   5. Cross-compile (Windows ARM64 / Linux WSL / macOS notes)
 echo   6. Environment check
-echo   7. 打包：MSI 安装包 + 便携版 zip（package）
+echo   7. 打包：MSI 安装包 + 独立 exe（package）
 echo   8. 测试：cargo test + clippy（test）
 echo   0. Exit
 echo.
@@ -207,28 +207,28 @@ call :pause_if
 goto menu
 
 rem ============================================================
-rem  package：一条命令产出 MSI + 便携版 zip（调用 tools\package.ps1）
+rem  package：一条命令产出 MSI + 独立 exe，产物统一放到 artifacts\（调用 tools\package.ps1）
 rem  package publish：额外生成 latest.json（需要 LANPIPE_RELEASE_URL）
 rem ============================================================
 :package
 if /i "%~2"=="publish" goto package_publish
 cls
-echo ===== 打包：MSI 安装包 + 便携版 zip =====
+echo ===== 打包：MSI 安装包 + 独立 exe =====
 echo.
 if not exist "%ROOT%\tools\package.ps1" (
   echo [错误] 缺少 tools\package.ps1，无法打包。
   set "PKG_RC=1"
   goto package_done
 )
-echo 调用 tools\package.ps1（MSI 由 Tauri 构建，便携版由 tools\make-portable.ps1 构建）
+echo 调用 tools\package.ps1（产物统一输出到 artifacts\）
 echo.
-"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\tools\package.ps1" -Bundles msi,portable
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\tools\package.ps1" -Bundles msi,exe
 set "PKG_RC=%ERRORLEVEL%"
 goto package_done
 
 :package_publish
 cls
-echo ===== 打包并发布：MSI + 便携版 zip + latest.json =====
+echo ===== 打包并发布：MSI + 独立 exe + latest.json =====
 echo.
 if not exist "%ROOT%\tools\package.ps1" (
   echo [错误] 缺少 tools\package.ps1，无法打包。
@@ -250,7 +250,7 @@ if not defined LANPIPE_RELEASE_URL (
 )
 echo 下载地址取自环境变量 LANPIPE_RELEASE_URL（此处不打印，避免其中的特殊字符破坏输出）
 echo.
-"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\tools\package.ps1" -Bundles msi,portable -Publish -Url "%LANPIPE_RELEASE_URL%"
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\tools\package.ps1" -Bundles msi,exe -Publish -Url "%LANPIPE_RELEASE_URL%"
 set "PKG_RC=%ERRORLEVEL%"
 goto package_done
 
