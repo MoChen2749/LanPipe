@@ -1,38 +1,50 @@
 ﻿<#
 .SYNOPSIS
-    一键打包 LanPipe：MSI 安装包 + 便携版 zip，并汇总产物（路径 / 大小 / SHA256）。
+    一键打包 LanPipe，并把所有最终产物统一放到仓库根目录的 artifacts\ 文件夹。
 
 .DESCRIPTION
-    打包流程（用 -Bundles 选择要构建的产物类型）：
-      1. 可选前端构建（npm run build，产出 dist\）
-      2. MSI 安装包：在 apps\desktop\src-tauri 下执行
-         npx --no-install tauri build --bundles msi
-         （首次打包会自动下载 WiX 到 %LOCALAPPDATA%\tauri，比较慢）
-      3. 便携版：调用 tools\make-portable.ps1 生成 zip
-      4. 汇总产物（路径 / 大小 / SHA256）
-      5. 可选：调用 tools\publish-release.ps1 生成 latest.json（-Publish）
+    产物类型（-Bundles 选择，默认 msi,exe）：
+      msi       Windows MSI 安装包 + 更新签名（.msi.sig）
+      exe       Windows 独立可执行文件
+      linux     Linux 桌面二进制 + 静态 CLI（Windows 上用 rust-lld 交叉编译 CLI，
+                桌面端需要 WSL 环境，见 tools\build-linux.ps1）
+      android   Android APK（arm64-v8a，debug 构建）
+      portable  便携版 zip（调用 tools\make-portable.ps1，默认不构建）
+      all       以上全部
+
+    产物统一命名，放在 artifacts\ 下：
+      LanPipe_<version>_x64_zh-CN.msi
+      LanPipe_<version>_x64_zh-CN.msi.sig
+      LanPipe_<version>_x64-windows.exe
+      LanPipe_<version>_x86_64-linux
+      lanpipe-cli_<version>_x86_64-linux
+      LanPipe_<version>_arm64-android-debug.apk
+      LanPipe_<version>_x64-portable.zip
+      latest.json（-Publish 时）
 
     注意：本文件必须保存为 UTF-8 带 BOM，否则 Windows PowerShell 5.1 会把中文
-    按 ANSI 解析而报错。不要用只写无 BOM 的编辑器保存。
+    按 ANSI 解析而报错。
 
 .PARAMETER Bundles
-    要构建的产物类型，可写 msi、portable（逗号分隔），默认两者都构建。
+    产物类型，可写 msi、exe、linux、android、portable、all，逗号分隔。默认 msi,exe。
 
 .PARAMETER SkipFrontend
-    跳过 npm run build（确认 dist\ 下已有最新前端产物时可加）。
+    跳过 npm run build（确认 dist\ 已是最新前端产物时可加）。
 
 .PARAMETER Version
-    可选，仅用于打印和核对版本号；实际版本以 apps\desktop\src-tauri\tauri.conf.json 为准。
+    可选，仅用于核对；实际版本以 apps\desktop\src-tauri\tauri.conf.json 为准。
 
 .PARAMETER OutDir
-    产物输出目录（相对仓库根或绝对路径），默认 target\release\bundle。
-    指定其他目录时会按 msi\、portable\ 子目录复制产物过去。
+    产物输出目录，默认 artifacts（仓库根目录下）。
+
+.PARAMETER Clean
+    构建前清空输出目录中旧的 LanPipe_* / lanpipe-cli_* / latest.json。
 
 .PARAMETER Publish
-    打包完成后生成自动更新清单 latest.json（需要 MSI；会调用 tools\publish-release.ps1）。
+    打包完成后生成自动更新清单 latest.json（需要 MSI）。
 
 .PARAMETER Url
-    MSI 的下载地址，写入 latest.json；未指定时读取环境变量 LANPIPE_RELEASE_URL。
+    MSI 下载地址，写入 latest.json；未指定时读取环境变量 LANPIPE_RELEASE_URL。
 
 .PARAMETER Notes
     可选，写入 latest.json 的更新说明。
@@ -41,19 +53,20 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1 -Bundles portable
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1 -Bundles all -Clean
 
 .EXAMPLE
-    $env:LANPIPE_RELEASE_URL = 'https://example.com/lanpipe/LanPipe_0.1.0_x64_zh-CN.msi'
+    $env:LANPIPE_RELEASE_URL = 'https://example.com/lanpipe/LanPipe_0.1.2_x64_zh-CN.msi'
     $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = 'lanpipe-dev-key'
     powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1 -Publish
 #>
 [CmdletBinding()]
 param(
-    [string[]]$Bundles = @('msi', 'portable'),
+    [string[]]$Bundles = @('msi', 'exe'),
     [switch]$SkipFrontend,
     [string]$Version = '',
-    [string]$OutDir = 'target\release\bundle',
+    [string]$OutDir = 'artifacts',
+    [switch]$Clean,
     [switch]$Publish,
     [string]$Url = '',
     [string]$Notes = ''
@@ -68,36 +81,25 @@ trap {
     }
     exit 1
 }
-# PowerShell 5.1 默认用 ANSI 输出；这里改成 UTF-8，保证中文与 cargo/npx 的 UTF-8 输出都不乱码。
-# 没有控制台句柄（被重定向）时设置可能失败，忽略即可。
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 
 $root = Split-Path -Parent $PSScriptRoot
 $bundleRoot = Join-Path $root 'target\release\bundle'
+$psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+if (-not (Test-Path -LiteralPath $psExe)) { $psExe = 'powershell' }
 $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 function Write-Title([string]$text) {
     Write-Host ''
     Write-Host ('==> ' + $text) -ForegroundColor Cyan
 }
-
-function Write-Detail([string]$text) {
-    Write-Host ('    ' + $text) -ForegroundColor Gray
-}
-
-function Write-Notice([string]$text) {
-    Write-Host ('[提示] ' + $text) -ForegroundColor Yellow
-}
-
-function Write-Done([string]$text) {
-    Write-Host ('[完成] ' + $text) -ForegroundColor Green
-}
+function Write-Detail([string]$text) { Write-Host ('    ' + $text) -ForegroundColor Gray }
+function Write-Notice([string]$text) { Write-Host ('[提示] ' + $text) -ForegroundColor Yellow }
+function Write-Done([string]$text) { Write-Host ('[完成] ' + $text) -ForegroundColor Green }
 
 function Assert-ExitCode([string]$what) {
-    if ($LASTEXITCODE -ne 0) {
-        throw ('{0} 失败（退出码 {1}），请查看上方日志。' -f $what, $LASTEXITCODE)
-    }
+    if ($LASTEXITCODE -ne 0) { throw ('{0} 失败（退出码 {1}），请查看上方日志。' -f $what, $LASTEXITCODE) }
 }
 
 function Resolve-RepoPath([string]$path) {
@@ -121,63 +123,67 @@ function Get-ToolPath([string]$name, [string]$hint, [string]$fallbackDir, [strin
     throw ('未找到 {0}。{1}' -f $name, $hint)
 }
 
-# 产物在 OutDir 下的目标路径：默认 bundle 目录下保持 msi\ / portable\ 结构。
-function Get-OutDirTargetPath([System.IO.FileInfo]$file) {
-    $sourceDir = [System.IO.Path]::GetFullPath($file.DirectoryName)
-    $defaultDir = [System.IO.Path]::GetFullPath($bundleRoot)
-    if ($sourceDir -eq $defaultDir) { return $file.FullName }
-    if ($sourceDir.StartsWith($defaultDir + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
-        $relative = $sourceDir.Substring($defaultDir.Length + 1)
-        return (Join-Path (Join-Path $OutDirAbs $relative) $file.Name)
-    }
-    return (Join-Path $OutDirAbs $file.Name)
+# 把一个文件复制到产物目录并统一改名；返回复制后的 FileInfo。
+function Publish-Artifact([string]$source, [string]$name) {
+    if (-not (Test-Path -LiteralPath $source)) { throw ('未找到待发布的产物：' + $source) }
+    $target = Join-Path $artifactDir $name
+    Copy-Item -LiteralPath $source -Destination $target -Force
+    Write-Detail ('产物：' + $target)
+    return (Get-Item -LiteralPath $target)
 }
 
-function Copy-IntoOutDir([System.IO.FileInfo]$file) {
-    $targetPath = Get-OutDirTargetPath $file
-    if ($targetPath -eq $file.FullName) { return $file }
-    $parent = Split-Path -Parent $targetPath
-    if ($parent -and -not (Test-Path -LiteralPath $parent)) {
-        New-Item -ItemType Directory -Force -Path $parent | Out-Null
-    }
-    Copy-Item -LiteralPath $file.FullName -Destination $targetPath -Force
-    Write-Detail ('已复制到 ' + $targetPath)
-    return (Get-Item -LiteralPath $targetPath)
+# 在目录里取最新修改的匹配文件。
+function Get-LatestFile([string]$dir, [string]$filter) {
+    if (-not (Test-Path -LiteralPath $dir)) { return $null }
+    return (Get-ChildItem -LiteralPath $dir -Filter $filter -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1)
 }
 
 # ---------------------------------------------------------------- 参数规范化
 $wanted = New-Object 'System.Collections.Generic.List[string]'
+$validBundles = @('msi', 'exe', 'linux', 'android', 'portable')
 foreach ($entry in $Bundles) {
     foreach ($piece in ($entry -split '[,;\s]+')) {
         $name = $piece.Trim().ToLowerInvariant()
         if ($name -eq '') { continue }
-        if ($name -ne 'msi' -and $name -ne 'portable') {
-            throw ('未知的 -Bundles 取值：{0}（可选：msi、portable）' -f $piece)
+        if ($name -eq 'all') {
+            foreach ($item in $validBundles) { if (-not $wanted.Contains($item)) { $wanted.Add($item) } }
+            continue
+        }
+        if ($validBundles -notcontains $name) {
+            throw ('未知的 -Bundles 取值：{0}（可选：{1}，或 all）' -f $piece, ($validBundles -join '、'))
         }
         if (-not $wanted.Contains($name)) { $wanted.Add($name) }
     }
 }
-if ($wanted.Count -eq 0) { throw '请至少指定一种产物类型：-Bundles msi,portable' }
+if ($wanted.Count -eq 0) { throw '请至少指定一种产物类型，例如 -Bundles msi,exe' }
 $wantMsi = $wanted.Contains('msi')
+$wantExe = $wanted.Contains('exe')
+$wantLinux = $wanted.Contains('linux')
+$wantAndroid = $wanted.Contains('android')
 $wantPortable = $wanted.Contains('portable')
+$needFrontend = $wantMsi -or $wantExe -or $wantLinux -or $wantAndroid -or $wantPortable
 $bundleNames = ($wanted -join ', ')
 
 if ($Publish -and -not $wantMsi) {
-    throw '生成 latest.json 需要 MSI：请使用 -Bundles msi,portable（默认）把 msi 包含进来。'
+    throw '生成 latest.json 需要 MSI：请把 msi 加入 -Bundles。'
 }
 
-$OutDirAbs = Resolve-RepoPath $OutDir
-if (-not (Test-Path -LiteralPath $OutDirAbs)) {
-    New-Item -ItemType Directory -Force -Path $OutDirAbs | Out-Null
+$artifactDir = Resolve-RepoPath $OutDir
+New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+if ($Clean) {
+    Get-ChildItem -LiteralPath $artifactDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like 'LanPipe_*' -or $_.Name -like 'lanpipe-cli_*' -or $_.Name -eq 'latest.json' } |
+        Remove-Item -Force
 }
 
 # ---------------------------------------------------------------- 前置检查
 Write-Host ''
 Write-Host '============================================================' -ForegroundColor Green
-Write-Host '  LanPipe 打包工具：MSI 安装包 + 便携版 zip' -ForegroundColor Green
+Write-Host '  LanPipe 打包工具' -ForegroundColor Green
 Write-Host ('  仓库：' + $root) -ForegroundColor Green
 Write-Host ('  产物类型：' + $bundleNames) -ForegroundColor Green
-Write-Host ('  输出目录：' + $OutDirAbs) -ForegroundColor Green
+Write-Host ('  产物目录：' + $artifactDir) -ForegroundColor Green
 Write-Host '============================================================' -ForegroundColor Green
 
 Write-Title '前置检查'
@@ -186,7 +192,6 @@ $tauriConfPath = Join-Path $root 'apps\desktop\src-tauri\tauri.conf.json'
 if (-not (Test-Path -LiteralPath $tauriConfPath)) {
     throw ('未找到 {0}，请确认在 LanPipe 仓库根目录下运行本脚本。' -f $tauriConfPath)
 }
-
 $realVersion = ''
 try {
     $confText = [System.IO.File]::ReadAllText($tauriConfPath, [System.Text.Encoding]::UTF8)
@@ -204,13 +209,8 @@ if (-not $realVersion) {
 }
 if (-not $realVersion) { $realVersion = '0.0.0' }
 Write-Detail ('版本：' + $realVersion)
-
-if ($Version -and $Version.Trim() -ne '') {
-    $requestedVersion = $Version.Trim()
-    Write-Detail ('指定版本：' + $requestedVersion)
-    if ($requestedVersion -ne $realVersion) {
-        Write-Notice ('指定版本与配置不一致：tauri.conf.json 为 {0}，实际产物按 {0} 命名；如需改版本请同时修改 tauri.conf.json 与 Cargo.toml。' -f $realVersion)
-    }
+if ($Version -and $Version.Trim() -ne '' -and $Version.Trim() -ne $realVersion) {
+    Write-Notice ('指定版本 {0} 与配置版本 {1} 不一致；产物按配置版本命名。' -f $Version.Trim(), $realVersion)
 }
 
 $nodeExe = Get-ToolPath 'node' '请安装 Node.js 18+（https://nodejs.org/）并确认 node 在 PATH 中。' '' ''
@@ -218,209 +218,233 @@ $npmExe = Get-ToolPath 'npm' 'npm 通常随 Node.js 一起安装，请检查 Nod
 $npxExe = Get-ToolPath 'npx' 'npx 通常随 Node.js 一起安装，请检查 Node.js 安装是否完整。' '' ''
 $cargoDir = Join-Path $env:USERPROFILE '.cargo\bin'
 $cargoExe = Get-ToolPath 'cargo' ('请安装 Rust（https://win.rustup.rs）或把 ' + $cargoDir + ' 加入 PATH 后重试。') $cargoDir 'cargo.exe'
+Write-Detail ('node ' + ((& $nodeExe --version 2>&1 | Out-String).Trim()) + '，' + ((& $cargoExe --version 2>&1 | Out-String).Trim()))
 
-$nodeVersion = (& $nodeExe --version 2>&1 | Out-String).Trim()
-$cargoVersion = (& $cargoExe --version 2>&1 | Out-String).Trim()
-Write-Detail ('node ' + $nodeVersion + '，' + $cargoVersion)
-
-if ($wantMsi) {
-    $rustcExe = Get-ToolPath 'rustc' ('请安装 Rust（https://win.rustup.rs）或把 ' + $cargoDir + ' 加入 PATH 后重试。') $cargoDir 'rustc.exe'
-    $rustcVersion = (& $rustcExe --version 2>&1 | Out-String).Trim()
-    Write-Detail ('rustc ' + $rustcVersion)
-
-    $tauriCmd = Join-Path $root 'node_modules\.bin\tauri.cmd'
-    if (-not (Test-Path -LiteralPath $tauriCmd)) {
-        throw '未找到 node_modules\.bin\tauri.cmd，请先在仓库根目录执行 npm install（需要 @tauri-apps/cli）。'
-    }
-    Write-Detail ('tauri CLI：' + $tauriCmd)
+$tauriCmd = Join-Path $root 'node_modules\.bin\tauri.cmd'
+if (($wantMsi -or $wantAndroid) -and -not (Test-Path -LiteralPath $tauriCmd)) {
+    throw '未找到 node_modules\.bin\tauri.cmd，请先在仓库根目录执行 npm install（需要 @tauri-apps/cli）。'
+}
+if ($wantLinux -and -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'build-linux.ps1'))) {
+    throw ('未找到 Linux 构建脚本：' + (Join-Path $PSScriptRoot 'build-linux.ps1'))
+}
+if ($wantPortable -and -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'make-portable.ps1'))) {
+    throw ('未找到便携版脚本：' + (Join-Path $PSScriptRoot 'make-portable.ps1'))
 }
 
-if ($wantPortable) {
-    $makePortable = Join-Path $PSScriptRoot 'make-portable.ps1'
-    if (-not (Test-Path -LiteralPath $makePortable)) {
-        throw ('未找到便携版脚本：' + $makePortable)
-    }
-}
-
+$publishUrl = ''
 if ($Publish) {
-    $publishScript = Join-Path $PSScriptRoot 'publish-release.ps1'
-    if (-not (Test-Path -LiteralPath $publishScript)) {
-        throw ('未找到发布脚本：' + $publishScript)
+    if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'publish-release.ps1'))) {
+        throw ('未找到发布脚本：' + (Join-Path $PSScriptRoot 'publish-release.ps1'))
     }
-
-    # 发布参数提前校验：把下载地址与签名口令的检查放在构建之前，
-    # 避免用户等了几分钟 MSI 构建后才发现参数缺失。
     $publishUrl = $Url
     if (-not $publishUrl) { $publishUrl = $env:LANPIPE_RELEASE_URL }
     $publishUrl = ([string]$publishUrl).Trim()
-    if (-not $publishUrl) {
-        throw '缺少 MSI 下载地址：请加 -Url <地址>，或先设置环境变量 LANPIPE_RELEASE_URL 再重试。'
-    }
-    if ($publishUrl -notmatch '^https?://') {
-        throw ('MSI 下载地址必须以 http:// 或 https:// 开头：' + $publishUrl)
-    }
+    if (-not $publishUrl) { throw '缺少 MSI 下载地址：请加 -Url <地址>，或先设置环境变量 LANPIPE_RELEASE_URL。' }
+    if ($publishUrl -notmatch '^https?://') { throw ('MSI 下载地址必须以 http:// 或 https:// 开头：' + $publishUrl) }
     Write-Detail ('发布地址：' + $publishUrl)
     if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
-        throw '缺少更新签名口令：请先设置环境变量 TAURI_SIGNING_PRIVATE_KEY_PASSWORD（本机开发密钥口令为 lanpipe-dev-key；正式发布请使用正式密钥）。'
+        throw '缺少更新签名口令：请先设置环境变量 TAURI_SIGNING_PRIVATE_KEY_PASSWORD。'
     }
 }
 Write-Done '前置检查通过'
 
 # ---------------------------------------------------------------- 前端构建
+$distIndex = Join-Path $root 'dist\index.html'
 if ($SkipFrontend) {
     Write-Title '跳过前端构建（-SkipFrontend）'
-    $distIndex = Join-Path $root 'dist\index.html'
-    if ($wantMsi -and -not (Test-Path -LiteralPath $distIndex)) {
-        throw ('跳过前端构建，但 dist\index.html 不存在：tauri build 需要前端产物，请去掉 -SkipFrontend 或先执行 npm run build。')
+    if ($needFrontend -and -not (Test-Path -LiteralPath $distIndex)) {
+        throw ('跳过前端构建，但 dist\index.html 不存在：请去掉 -SkipFrontend 或先执行 npm run build。')
     }
 } else {
     Write-Title '构建前端（npm run build）'
-    Write-Detail '执行 tsc --noEmit && vite build ...'
     Push-Location $root
     try {
         & $npmExe run build
         Assert-ExitCode 'npm run build（前端构建）'
-    } finally {
-        Pop-Location
-    }
-    $distIndex = Join-Path $root 'dist\index.html'
-    if (-not (Test-Path -LiteralPath $distIndex)) {
-        throw '前端构建后仍未找到 dist\index.html，请检查 vite.config.ts 与构建日志。'
-    }
+    } finally { Pop-Location }
+    if (-not (Test-Path -LiteralPath $distIndex)) { throw '前端构建后仍未找到 dist\index.html，请检查 vite.config.ts 与构建日志。' }
     Write-Done '前端构建完成（dist\）'
 }
 
-# ---------------------------------------------------------------- MSI
-$msiFile = $null
+# ---------------------------------------------------------------- Windows exe / MSI
+$exeSource = Join-Path $root 'target\release\lanpipe.exe'
+if ($wantExe -and -not $wantMsi) {
+    Write-Title '构建 Windows 独立可执行文件（cargo build --release）'
+    Push-Location $root
+    try {
+        & $cargoExe build --release --features custom-protocol -p lanpipe
+        Assert-ExitCode 'cargo build --release --features custom-protocol -p lanpipe'
+    } finally { Pop-Location }
+}
+
 if ($wantMsi) {
     Write-Title '构建 MSI 安装包（tauri build --bundles msi）'
     Write-Detail '首次打包会自动下载 WiX 到 %LOCALAPPDATA%\tauri，可能需要几分钟 ...'
-    $srcTauri = Join-Path $root 'apps\desktop\src-tauri'
-    Push-Location $srcTauri
+    Push-Location (Join-Path $root 'apps\desktop\src-tauri')
     try {
         & $npxExe --no-install tauri build --bundles msi
         Assert-ExitCode 'npx --no-install tauri build --bundles msi'
-    } finally {
-        Pop-Location
-    }
-
-    $msiDirs = @(
-        (Join-Path $root 'target\release\bundle\msi'),
-        (Join-Path $root 'apps\desktop\src-tauri\target\release\bundle\msi')
-    )
-    $candidates = @()
-    foreach ($dir in $msiDirs) {
-        if (Test-Path -LiteralPath $dir) {
-            $candidates += @(Get-ChildItem -LiteralPath $dir -Filter '*.msi' -File -ErrorAction SilentlyContinue)
-        }
-    }
-    if ($candidates.Count -eq 0) {
-        throw 'tauri build 已结束，但未找到 MSI 产物（target\release\bundle\msi\*.msi），请查看上方 tauri 日志。'
-    }
-    $msiFile = $candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($msiFile.Name -notlike ('*' + $realVersion + '*')) {
-        Write-Notice ('MSI 文件名与配置版本 {0} 不一致：{1}' -f $realVersion, $msiFile.Name)
-    }
-    Write-Detail ('MSI：' + $msiFile.FullName)
+    } finally { Pop-Location }
     Write-Done 'MSI 构建完成'
 }
 
-# ---------------------------------------------------------------- 便携版
-$zipFile = $null
-if ($wantPortable) {
-    Write-Title '构建便携版 zip（tools\make-portable.ps1）'
-    $exePath = Join-Path $root 'target\release\lanpipe.exe'
-    if (-not (Test-Path -LiteralPath $exePath)) {
-        if ($wantMsi) {
-            throw ('MSI 构建后仍未找到 {0}，请检查 tauri build 是否真正完成。' -f $exePath)
-        }
-        Write-Detail '未找到 target\release\lanpipe.exe，先编译 release 版 ...'
-        Push-Location $root
-        try {
-            & $cargoExe build --release --features custom-protocol -p lanpipe
-            Assert-ExitCode 'cargo build --release --features custom-protocol -p lanpipe'
-        } finally {
-            Pop-Location
-        }
-    }
-    if (-not (Test-Path -LiteralPath $exePath)) {
-        throw ('仍未找到 {0}，无法生成便携版。' -f $exePath)
-    }
-
+# ---------------------------------------------------------------- Linux
+if ($wantLinux) {
+    Write-Title '构建 Linux CLI（rust-lld + musl 交叉编译）'
     Push-Location $root
     try {
-        $null = & (Join-Path $PSScriptRoot 'make-portable.ps1')
-    } finally {
-        Pop-Location
-    }
+        & $psExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'build-linux.ps1') -Command cli
+        Assert-ExitCode 'tools\build-linux.ps1 -Command cli'
+    } finally { Pop-Location }
 
-    $zipDir = Join-Path $root 'target\release\bundle\portable'
-    $expectedZip = Join-Path $zipDir ('LanPipe_{0}_x64-portable.zip' -f $realVersion)
-    if (Test-Path -LiteralPath $expectedZip) {
-        $zipFile = Get-Item -LiteralPath $expectedZip
+    Write-Title '构建 Linux 桌面二进制（WSL 内编译，需几分钟）'
+    Push-Location $root
+    try {
+        & $psExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'build-linux.ps1') -Command desktop
+        Assert-ExitCode 'tools\build-linux.ps1 -Command desktop'
+    } finally { Pop-Location }
+    Write-Done 'Linux 构建完成'
+}
+
+# ---------------------------------------------------------------- Android
+if ($wantAndroid) {
+    Write-Title '构建 Android APK（arm64-v8a，debug）'
+    # Android SDK / NDK：优先用本机已装位置，避免依赖当前会话是否继承过环境变量。
+    $sdkCandidates = @('F:\Android\android-sdk', (Join-Path $env:LOCALAPPDATA 'Android\Sdk'))
+    $sdk = $sdkCandidates | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'platform-tools')) } | Select-Object -First 1
+    if ($sdk) {
+        $env:ANDROID_HOME = $sdk
+        $env:ANDROID_SDK_ROOT = $sdk
+        $ndkDir = Join-Path $sdk 'ndk'
+        if (Test-Path -LiteralPath $ndkDir) {
+            $ndk = Get-ChildItem -LiteralPath $ndkDir -Directory | Sort-Object Name -Descending | Select-Object -First 1
+            if ($ndk) { $env:NDK_HOME = $ndk.FullName }
+        }
+        Write-Detail ('Android SDK：' + $sdk)
     } else {
-        $zipFile = Get-ChildItem -LiteralPath $zipDir -Filter '*.zip' -File -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        throw '未找到 Android SDK：请安装后再用 -Bundles android。'
     }
-    if (-not $zipFile) {
-        throw ('未找到便携版 zip（{0}），请检查 make-portable.ps1 的输出。' -f $zipDir)
+    $javaHome = 'C:\Program Files\Java\jdk-17'
+    if (Test-Path -LiteralPath $javaHome) { $env:JAVA_HOME = $javaHome }
+    $buildRoot = 'F:\Projects\.lanpipe-build'
+    if (Test-Path -LiteralPath $buildRoot) {
+        $env:CARGO_HOME = Join-Path $buildRoot 'cargo-home'
+        $env:GRADLE_USER_HOME = Join-Path $buildRoot 'gradle-home'
+        $env:TEMP = Join-Path $buildRoot 'tmp'
+        $env:TMP = Join-Path $buildRoot 'tmp'
+        $env:ANDROID_USER_HOME = Join-Path $buildRoot 'android-home'
     }
-    Write-Detail ('zip：' + $zipFile.FullName)
-    Write-Done '便携版构建完成'
+    Push-Location $root
+    try {
+        & $npxExe --no-install tauri android build --apk --debug --target aarch64
+        Assert-ExitCode 'npx --no-install tauri android build --apk --debug --target aarch64'
+    } finally { Pop-Location }
+    Write-Done 'Android APK 构建完成'
 }
 
-# ---------------------------------------------------------------- 汇总产物
+# ---------------------------------------------------------------- 收集产物
+Write-Title '收集产物到 artifacts 目录'
 $artifacts = New-Object 'System.Collections.Generic.List[object]'
-if ($msiFile) {
-    $msiFile = Copy-IntoOutDir $msiFile
-    $artifacts.Add([pscustomobject]@{ Kind = 'MSI'; Path = $msiFile.FullName })
+
+if ($wantMsi) {
+    $msi = $null
+    foreach ($dir in @((Join-Path $bundleRoot 'msi'), (Join-Path $root 'apps\desktop\src-tauri\target\release\bundle\msi'))) {
+        $found = Get-LatestFile $dir '*.msi'
+        if ($found -and (-not $msi -or $found.LastWriteTime -gt $msi.LastWriteTime)) { $msi = $found }
+    }
+    if (-not $msi) { throw 'tauri build 已结束，但未找到 MSI 产物，请查看上方日志。' }
+    $msiName = 'LanPipe_{0}_x64_zh-CN.msi' -f $realVersion
+    $artifacts.Add([pscustomobject]@{ Kind = 'MSI 安装包'; File = (Publish-Artifact $msi.FullName $msiName) })
+    $sigSource = $msi.FullName + '.sig'
+    if (Test-Path -LiteralPath $sigSource) {
+        $artifacts.Add([pscustomobject]@{ Kind = 'MSI 更新签名'; File = (Publish-Artifact $sigSource ($msiName + '.sig')) })
+    }
 }
-if ($zipFile) {
-    $zipFile = Copy-IntoOutDir $zipFile
-    $artifacts.Add([pscustomobject]@{ Kind = '便携版 zip'; Path = $zipFile.FullName })
+
+if ($wantExe) {
+    if (-not (Test-Path -LiteralPath $exeSource)) {
+        throw ('未找到 {0}，请确认已执行 Windows release 构建。' -f $exeSource)
+    }
+    $artifacts.Add([pscustomobject]@{ Kind = 'Windows 独立 exe'; File = (Publish-Artifact $exeSource ('LanPipe_{0}_x64-windows.exe' -f $realVersion)) })
+}
+
+if ($wantLinux) {
+    $linuxDir = Join-Path $root 'dist-linux'
+    $desktopBin = Join-Path $linuxDir 'lanpipe'
+    $cliBin = Join-Path $linuxDir 'lanpipe-cli'
+    if (-not (Test-Path -LiteralPath $cliBin)) { throw ('未找到 Linux CLI 产物：' + $cliBin) }
+    $artifacts.Add([pscustomobject]@{ Kind = 'Linux CLI'; File = (Publish-Artifact $cliBin ('lanpipe-cli_{0}_x86_64-linux' -f $realVersion)) })
+    if (Test-Path -LiteralPath $desktopBin) {
+        $artifacts.Add([pscustomobject]@{ Kind = 'Linux 桌面二进制'; File = (Publish-Artifact $desktopBin ('LanPipe_{0}_x86_64-linux' -f $realVersion)) })
+    } else {
+        Write-Notice '未找到 Linux 桌面二进制（dist-linux\lanpipe），本次只发布 Linux CLI。'
+    }
+}
+
+if ($wantAndroid) {
+    $apkDirs = @(
+        (Join-Path $root 'apps\desktop\src-tauri\gen\android\app\build\outputs\apk\universal\debug'),
+        (Join-Path $root 'apps\desktop\src-tauri\gen\android\app\build\outputs\apk\aarch64\debug'),
+        (Join-Path $root 'apps\desktop\src-tauri\gen\android\app\build\outputs\apk\release')
+    )
+    $apk = $null
+    foreach ($dir in $apkDirs) {
+        $found = Get-LatestFile $dir '*.apk'
+        if ($found -and (-not $apk -or $found.LastWriteTime -gt $apk.LastWriteTime)) { $apk = $found }
+    }
+    if ($apk) {
+        $artifacts.Add([pscustomobject]@{ Kind = 'Android APK'; File = (Publish-Artifact $apk.FullName ('LanPipe_{0}_arm64-android-debug.apk' -f $realVersion)) })
+    } else {
+        Write-Notice '未找到 Android APK 产物，跳过。'
+    }
+}
+
+if ($wantPortable) {
+    Write-Title '构建便携版 zip（tools\make-portable.ps1）'
+    Push-Location $root
+    try {
+        & $psExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'make-portable.ps1')
+        Assert-ExitCode 'tools\make-portable.ps1'
+    } finally { Pop-Location }
+    $zip = Get-LatestFile (Join-Path $bundleRoot 'portable') '*.zip'
+    if ($zip) {
+        $artifacts.Add([pscustomobject]@{ Kind = '便携版 zip'; File = (Publish-Artifact $zip.FullName ('LanPipe_{0}_x64-portable.zip' -f $realVersion)) })
+    } else {
+        Write-Notice '未找到便携版 zip，跳过。'
+    }
 }
 
 # ---------------------------------------------------------------- latest.json
 if ($Publish) {
     Write-Title '生成自动更新清单 latest.json'
-    if (-not $msiFile) {
-        throw '生成 latest.json 需要 MSI 产物，但本次没有找到 MSI。'
-    }
-    # 下载地址与签名口令已在前置检查阶段校验并写入 $publishUrl。
-    if (-not $publishUrl) {
-        throw '缺少 MSI 下载地址：请加 -Url <地址>，或先设置环境变量 LANPIPE_RELEASE_URL 再重试。'
-    }
-
-    $latestJson = Join-Path $OutDirAbs 'latest.json'
+    $msiArtifact = $artifacts | Where-Object { $_.Kind -eq 'MSI 安装包' } | Select-Object -First 1
+    if (-not $msiArtifact) { throw '生成 latest.json 需要 MSI 产物，但本次没有 MSI。' }
+    $latestJson = Join-Path $artifactDir 'latest.json'
     $publishArgs = @{
-        Installer = $msiFile.FullName
+        Installer = $msiArtifact.File.FullName
         Version   = $realVersion
         Url       = $publishUrl
         OutFile   = $latestJson
     }
     if ($Notes -and $Notes.Trim() -ne '') { $publishArgs['Notes'] = $Notes }
-
     Push-Location $root
     try {
-        & (Join-Path $PSScriptRoot 'publish-release.ps1') @publishArgs
-        Assert-ExitCode 'publish-release.ps1'
-    } finally {
-        Pop-Location
-    }
-    if (-not (Test-Path -LiteralPath $latestJson)) {
-        throw ('未生成 latest.json：' + $latestJson)
-    }
-    $artifacts.Add([pscustomobject]@{ Kind = '更新清单'; Path = $latestJson })
+        & $psExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'publish-release.ps1') @publishArgs
+        Assert-ExitCode 'tools\publish-release.ps1'
+    } finally { Pop-Location }
+    if (-not (Test-Path -LiteralPath $latestJson)) { throw ('未生成 latest.json：' + $latestJson) }
+    $artifacts.Add([pscustomobject]@{ Kind = '更新清单'; File = (Get-Item -LiteralPath $latestJson) })
     Write-Done 'latest.json 生成完成'
 }
 
 # ---------------------------------------------------------------- 产物汇总
 Write-Host ''
 Write-Host '================ 产物汇总 ================' -ForegroundColor Green
+Write-Host ('目录：' + $artifactDir) -ForegroundColor Green
 foreach ($artifact in $artifacts) {
-    $file = Get-Item -LiteralPath $artifact.Path
+    $file = $artifact.File
     $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
-    Write-Host ('[{0}] {1}' -f $artifact.Kind, $file.FullName) -ForegroundColor White
+    Write-Host ('[{0}] {1}' -f $artifact.Kind, $file.Name) -ForegroundColor White
     Write-Host ('       大小：{0:N2} MB（{1:N0} 字节）' -f ($file.Length / 1MB), $file.Length)
     Write-Host ('       SHA256：{0}' -f $hash) -ForegroundColor Yellow
 }

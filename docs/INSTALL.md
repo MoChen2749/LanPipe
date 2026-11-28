@@ -27,7 +27,7 @@
 
 ### 1.2 MSI 安装
 
-构建产物的 MSI 位于仓库根目录 `target/release/bundle/msi/`，提供中文与英文两个安装包：
+构建产物的 MSI 复制到仓库根目录 `artifacts/`（`LanPipe_<version>_x64_zh-CN.msi`，可用 `tools/package.ps1` 一键生成），提供中文安装包：
 
 ```text
 LanPipe_0.1.2_x64_zh-CN.msi
@@ -248,31 +248,43 @@ node tools/check-i18n.mjs
 
 ### 4.4 生成发行物
 
-Windows MSI：
+推荐用统一的打包脚本，**所有最终产物都会复制到仓库根目录 `artifacts/`**（已在 `.gitignore` 中忽略）：
+
+```powershell
+powershell -File tools\package.ps1                      # 默认 msi,exe
+powershell -File tools\package.ps1 -Bundles all -Clean   # 全部产物并先清空 artifacts
+```
+
+产物命名固定：
+
+| 产物 | 文件名 |
+| --- | --- |
+| Windows MSI | `LanPipe_<version>_x64_zh-CN.msi` |
+| 更新签名 | `LanPipe_<version>_x64_zh-CN.msi.sig` |
+| Windows 独立 exe | `LanPipe_<version>_x64-windows.exe` |
+| Linux 桌面二进制 | `LanPipe_<version>_x86_64-linux` |
+| Linux 静态 CLI | `lanpipe-cli_<version>_x86_64-linux` |
+| Android APK | `LanPipe_<version>_arm64-android-debug.apk` |
+| 更新清单 | `latest.json` |
+
+也可以分步手工构建（中间产物仍在 `target/release/bundle/msi/`、`dist-linux/`）：
 
 ```powershell
 npm run build
 cd apps/desktop/src-tauri
-npx tauri build --bundles msi
-```
-
-产物在仓库根目录的 `target/release/bundle/msi/`。首次构建会自动下载 WiX 工具链。
-
-Windows 独立 exe：
-
-```powershell
-cargo build --release --features custom-protocol -p lanpipe
-Copy-Item target\release\lanpipe.exe "target\release\artifacts\LanPipe_vX.Y.Z_x64-windows.exe"
+npx tauri build --bundles msi          # MSI -> target/release/bundle/msi/
+cd ../..
+cargo build --release --features custom-protocol -p lanpipe   # 独立 exe -> target/release/lanpipe.exe
 ```
 
 Linux 二进制（原生 Linux，或在 Windows 上经 `tools/build-linux.ps1` 走 WSL）：
 
 ```bash
 bash tools/build-linux.sh desktop        # 桌面端 -> dist-linux/lanpipe
-CLI_TARGET=x86_64-unknown-linux-musl bash tools/build-linux.sh cli   # 静态 CLI
+CLI_TARGET=x86_64-unknown-linux-musl bash tools/build-linux.sh cli   # 静态 CLI -> dist-linux/lanpipe-cli
 ```
 
-上述产物由 `.github/workflows/release.yml` 在推送 `v*` tag 时自动构建并上传 Release。自动更新签名与发布：`tools/publish-release.ps1` 生成 `.sig` 与 `latest.json`，签名私钥通过 `TAURI_SIGNING_PRIVATE_KEY` 与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 提供；更新端点为仓库 Release 的 `latest.json`。
+首次构建会自动下载 WiX 工具链。上述产物由 `.github/workflows/release.yml` 在推送 `v*` tag 时自动构建并上传 Release。自动更新签名与发布：`tools/publish-release.ps1` 生成 `.sig` 与 `latest.json`，签名私钥通过 `TAURI_SIGNING_PRIVATE_KEY` 与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 提供；更新端点为仓库 Release 的 `latest.json`。
 
 ## 5. 常见问题（FAQ）
 

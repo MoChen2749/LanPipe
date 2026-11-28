@@ -50,7 +50,7 @@ LanPipe 解决的是「两台设备之间搬运大量文件」这一类需求：
 
 ### 3.1 使用安装包（Windows，推荐）
 
-双击 `LanPipe_0.1.2_x64_zh-CN.msi`（位于 `target\release\bundle\msi\`，或从 Release 下载）按向导安装；静默安装（需要管理员权限）：
+双击 `artifacts\LanPipe_0.1.2_x64_zh-CN.msi`（本地打包产物；或从 Release 下载）按向导安装；静默安装（需要管理员权限）：
 
 ```powershell
 msiexec /i "LanPipe_0.1.2_x64_zh-CN.msi" /qn
@@ -279,7 +279,7 @@ cargo build --release --features custom-protocol -p lanpipe
 cargo test                  # 工作区全部测试
 cargo test -p lanpipe-net   # 协议与传输端到端测试
 cargo clippy --workspace --all-targets -- -D warnings
-build.bat package           # 本地打包 MSI（含 SHA256 汇总）
+build.bat package           # 本地打包（默认 msi,exe），产物统一输出到 artifacts/
 build.bat test              # 代码门禁：cargo test + clippy
 node tools/check-i18n.mjs   # 校验 i18n key 使用情况
 ```
@@ -290,10 +290,27 @@ Linux 构建（原生 Linux / WSL / 容器 / CI 通用）：
 bash tools/build-linux.sh deps      # 检查依赖
 bash tools/build-linux.sh cli       # 静态 CLI -> dist-linux/lanpipe-cli
 bash tools/build-linux.sh desktop   # 桌面程序 -> dist-linux/lanpipe
-bash tools/build-linux.sh desktop   # 桌面二进制 -> dist-linux/lanpipe
 ```
 
 Windows 上可用 `tools/build-linux.ps1`：`-Command cli` 直接交叉编译静态 CLI（rust 自带 lld，不需要 WSL）；`desktop`/`bundle`/`deps` 经 WSL 执行。
+
+**产物统一目录**：`tools/package.ps1` 把所有最终文件复制到仓库根目录 `artifacts\`（已在 `.gitignore` 中忽略），命名固定为：
+
+| 产物 | 文件名 |
+| --- | --- |
+| Windows MSI | `LanPipe_<version>_x64_zh-CN.msi` |
+| 更新签名 | `LanPipe_<version>_x64_zh-CN.msi.sig` |
+| Windows 独立 exe | `LanPipe_<version>_x64-windows.exe` |
+| Linux 桌面二进制 | `LanPipe_<version>_x86_64-linux` |
+| Linux 静态 CLI | `lanpipe-cli_<version>_x86_64-linux` |
+| Android APK | `LanPipe_<version>_arm64-android-debug.apk` |
+| 更新清单 | `latest.json` |
+
+```powershell
+powershell -File tools\package.ps1                      # 默认 msi,exe
+powershell -File tools\package.ps1 -Bundles all -Clean   # 全部产物，先清空 artifacts
+powershell -File tools\package.ps1 -Bundles msi,linux,android
+```
 
 
 Windows 上若 `cargo test` 报 MSVC `D8050`（编译 ring 时无法写入调试记录），先设置 `$env:CARGO_PROFILE_DEV_DEBUG=0` 再跑测试；CI 已默认设置该变量。
@@ -306,9 +323,9 @@ Windows 上若 `cargo test` 报 MSVC `D8050`（编译 ring 时无法写入调试
 - 同机双实例自测：`--instance b`，配置目录为 `%APPDATA%\LanPipe-b`；首次生成配置时 TCP 端口整体 +10，UDP 不变。
 - 界面截图：以 `LANPIPE_CDP=9333` 启动应用，再运行 `node tools/ui-shot.mjs 9333 shot.png [navIndex]`（`navIndex` 0–4 对应发送、接收、历史、诊断、设置；`--tall` 截整页、`--mobile` 截 390×844）。
 - 材质调试：`LANPIPE_BACKDROP=mica|acrylic|none`、`LANPIPE_TRANSPARENCY=force`。
-- 一条命令打包：`build.bat package`（= `tools/package.ps1`，顺序：前端构建 → MSI → 打印路径/大小/SHA256；仅供本地验证）。
-- 打包并生成更新清单：`build.bat package publish`（需先设置 `LANPIPE_RELEASE_URL`，额外调用 `tools/publish-release.ps1` 生成 `latest.json`）。
-- 单独打包：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1 -Bundles msi`（`-SkipFrontend` 跳过前端构建；`-OutDir` 指定输出目录）。
+- 一条命令打包：`build.bat package`（= `tools/package.ps1`，默认产物 MSI + 独立 exe，全部复制到 `artifacts\` 并打印大小与 SHA256）。
+- 打包并生成更新清单：`build.bat package publish`（需先设置 `LANPIPE_RELEASE_URL`，额外调用 `tools/publish-release.ps1` 生成 `artifacts\latest.json`）。
+- 单独打包：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1 -Bundles msi,exe,linux,android`（`-SkipFrontend` 跳过前端构建；`-OutDir` 指定输出目录；`-Clean` 先清空旧产物）。
 - 首次打包会自动下载 WiX 到 `%LOCALAPPDATA%\tauri`；cargo 需在 PATH 中（`%USERPROFILE%\.cargo\bin`）。
 - 发布：`tools/publish-release.ps1` 生成 `.sig` 与 `latest.json`，签名密钥由 `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 提供。
 

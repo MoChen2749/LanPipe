@@ -57,3 +57,6 @@ docs/tmp/
 
 # Linux 锟斤拷锟斤拷锟斤拷锟斤拷
 /dist-linux/
+
+# 打包产物（tools/package.ps1 输出）
+/artifacts/

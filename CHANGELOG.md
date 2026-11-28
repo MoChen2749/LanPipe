@@ -7,6 +7,7 @@
 ### 新增
 
 - Android 客户端：复用 Rust 传输核心与前端，Fluent 2 观感 + 底部 5 项导航；系统文件选择器（SAF）多选文件/目录后拷贝到缓存再发送；前台服务、通知权限、多播锁、edge-to-edge 与系统返回键适配。
+- 打包产物统一目录：`tools/package.ps1` 支持 `-Bundles msi,exe,linux,android,portable,all`，所有最终文件复制到仓库根目录 `artifacts/` 并按 `<应用>_<版本>_<平台>.<扩展名>` 固定命名；新增 `-Clean`；`release.yml` 同步使用 `artifacts/`。
 
 ### 修复
 

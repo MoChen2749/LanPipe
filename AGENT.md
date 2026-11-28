@@ -679,13 +679,14 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 
 ### 16.11 M3 打包与分发（2026-11-22）
 
-**打包入口**：`build.bat package` / `build.bat package publish`，内部调用 `tools/package.ps1`（前端构建 → MSI → 汇总路径/大小/SHA256；仅供本地验证；`-Publish -Url` 时再生成 `latest.json`）。单独使用：`powershell -File tools/package.ps1 -Bundles msi [-SkipFrontend] [-OutDir <dir>]`。
+**打包入口**：`build.bat package` / `build.bat package publish`，内部调用 `tools/package.ps1`。**所有最终产物统一输出到仓库根目录 `artifacts/`**（`.gitignore` 已忽略），命名固定：`LanPipe_<version>_x64_zh-CN.msi`（+ `.msi.sig`）、`LanPipe_<version>_x64-windows.exe`、`LanPipe_<version>_x86_64-linux`、`lanpipe-cli_<version>_x86_64-linux`、`LanPipe_<version>_arm64-android-debug.apk`、`latest.json`。
 
-- **MSI（主交付）**：`bundle.targets = ["msi"]`、`bundle.windows.wix.language = ["zh-CN"]`，产物 `target/release/bundle/msi/LanPipe_0.1.2_x64_zh-CN.msi`（约 4.0 MB）。
+- 用法：`powershell -File tools/package.ps1`（默认 `msi,exe`）；`-Bundles msi,exe,linux,android,portable,all`；`-SkipFrontend`、`-Clean`、`-OutDir`；`-Publish -Url` 额外生成 `latest.json`。
+- **MSI（主交付）**：`bundle.targets = ["msi"]`、`bundle.windows.wix.language = ["zh-CN"]`，构建产物仍在 `target/release/bundle/msi/`，脚本复制为 `artifacts/LanPipe_<version>_x64_zh-CN.msi`（约 4.0 MB）。
   - 安装位置 `C:\Program Files\LanPipe`（perMachine，需要管理员），带卸载快捷方式与「应用和功能」条目；
   - 版本信息来自 `tauri.conf.json` 的 `version` + `bundle.publisher/copyright/shortDescription/longDescription/licenseFile`；
   - 实测：`msiexec /i ... /qn` → 安装成功、`lanpipe.exe` 可运行、`msiexec /x {ProductCode} /qn` → 卸载干净。
-- **独立 exe**：`target/release/lanpipe.exe` 复制为 `LanPipe_vX.Y.Z_x64-windows.exe` 直接分发（需 WebView2 Runtime），不再打便携 zip。
+- **独立 exe / Linux / Android**：均由 `tools/package.ps1` 收集到 `artifacts/`：Windows 独立 exe 直接分发（需 WebView2 Runtime）；Linux 桌面二进制与静态 CLI 由 `tools/build-linux.ps1` 构建；Android 用 `npx tauri android build --apk --debug --target aarch64` 构建 debug APK（尚未做 release 签名）。不再默认打便携 zip（`-Bundles portable` 仍可用）。
 - **NSIS（per-user）**：配置保留（`installMode=currentUser`、简中/英文、installerIcon、startMenuFolder），但本机 `setup.exe /S` 返回 0 且不落盘（临时目录改为可写目录后才不报 NSIS Error），暂不作为交付；待查 Tauri NSIS 静默模式的 abort 原因。
 - 打包注意：先 `npm run build` 再 `npx tauri build`；`cargo` 需在 PATH；首次打包下载 WiX/NSIS 到 `%LOCALAPPDATA%\tauri`。
 

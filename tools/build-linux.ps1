@@ -94,8 +94,31 @@ function ConvertTo-WslPath([string]$WinPath) {
 function Invoke-InWsl([string]$ScriptCommand) {
   $pick = Get-WslDistro
   $linuxRoot = ConvertTo-WslPath $Root
-  Write-Step "在 WSL ($pick) 中执行: $ScriptCommand"
-  & wsl.exe -d $pick -u root -- bash -lc "cd '$linuxRoot' && $ScriptCommand"
+  # Windows 侧 node_modules 是 win32 版本（rollup/tauri CLI 的原生包不通用），
+  # 所以 WSL 内必须在 ext4 的工作副本里构建；这里先同步源码，再构建，最后把产物拷回。
+  $wslSrc = '/root/lanpipe-src'
+  if ($env:LANPIPE_WSL_SRC) { $wslSrc = $env:LANPIPE_WSL_SRC }
+  $linuxOut = ConvertTo-WslPath (Join-Path $Root 'dist-linux')
+  $bash = @"
+set -e
+export PATH="/root/.cargo/bin:`$PATH"
+SRC='$linuxRoot'
+DST='$wslSrc'
+OUT='$linuxOut'
+mkdir -p "`$DST" "`$OUT"
+rsync -a --delete --exclude target --exclude target-linux --exclude node_modules --exclude dist-bin --exclude .git --exclude artifacts --exclude dist-linux "`$SRC/" "`$DST/"
+cd "`$DST"
+if [ ! -d node_modules ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then npm ci; fi
+$ScriptCommand
+if [ -d dist-linux ]; then rsync -a dist-linux/ "`$OUT/"; fi
+"@
+  # PowerShell → wsl.exe 的多行参数会被拆坏，这里先落成脚本文件再让 bash 执行。
+  $shPath = Join-Path $Root 'target\wsl-build.sh'
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $shPath) | Out-Null
+  [System.IO.File]::WriteAllText($shPath, ($bash -replace "`r`n", "`n"), (New-Object System.Text.UTF8Encoding($false)))
+  $shWsl = ConvertTo-WslPath $shPath
+  Write-Step "在 WSL ($pick) 中构建（工作副本 $wslSrc）"
+  & wsl.exe -d $pick -u root -- bash $shWsl
   if ($LASTEXITCODE -ne 0) { throw "WSL 构建失败（退出码 $LASTEXITCODE）" }
 }
 
