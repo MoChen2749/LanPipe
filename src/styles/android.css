@@ -1,0 +1,617 @@
+/* ==========================================================================
+   Android（Tauri 移动端）适配层
+   --------------------------------------------------------------------------
+   所有规则都挂在 :root[data-platform="android"] 下，Windows 桌面路径完全不变。
+   设计稿：docs/mobile/ANDROID-UI.md
+   1 CSS px = 1 dp；底部 Tab 布局 <600dp，600–839dp 左侧 Rail，>=840dp 两列。
+   ========================================================================== */
+
+:root[data-platform="android"] {
+  --android-titlebar-h: 44px;
+  --android-tabbar-h: 56px;
+  /* 兜底值：原生 insets 事件到达前先用安全区 + 24px 估算 */
+  --android-inset-top: max(env(safe-area-inset-top), 24px);
+  --android-inset-bottom: max(env(safe-area-inset-bottom), 24px);
+  --android-page-pad: 16px;
+  --android-gap: 12px;
+  --android-control-h: 44px;
+  --android-list-row-h: 56px;
+  --android-glass-titlebar: rgba(245, 245, 245, 0.92);
+  --android-glass-tabbar: rgba(255, 255, 255, 0.86);
+  --android-state-pressed: rgba(0, 0, 0, 0.05);
+  --android-state-pressed-strong: rgba(0, 0, 0, 0.09);
+  --android-sheet-radius: 16px;
+  --android-scrim: rgba(0, 0, 0, 0.32);
+  --android-sheet-shadow: 0 -8px 24px rgba(0, 0, 0, 0.16);
+  --android-tab-indicator: var(--accent-soft);
+  /* 触摸目标统一放大到 44dp（视觉可小于 44，用 padding 补足） */
+  --control-h: 44px;
+}
+
+:root[data-platform="android"][data-theme="dark"] {
+  --android-glass-titlebar: rgba(20, 20, 20, 0.92);
+  --android-glass-tabbar: rgba(41, 41, 41, 0.86);
+  --android-state-pressed: rgba(255, 255, 255, 0.06);
+  --android-state-pressed-strong: rgba(255, 255, 255, 0.1);
+  --android-scrim: rgba(0, 0, 0, 0.56);
+  --android-sheet-shadow: 0 -8px 24px rgba(0, 0, 0, 0.32);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-platform="android"]:not([data-theme="light"]) {
+    --android-glass-titlebar: rgba(20, 20, 20, 0.92);
+    --android-glass-tabbar: rgba(41, 41, 41, 0.86);
+    --android-state-pressed: rgba(255, 255, 255, 0.06);
+    --android-state-pressed-strong: rgba(255, 255, 255, 0.1);
+    --android-scrim: rgba(0, 0, 0, 0.56);
+    --android-sheet-shadow: 0 -8px 24px rgba(0, 0, 0, 0.32);
+  }
+}
+
+:root[data-platform="android"] body {
+  font-size: 14px;
+  line-height: 20px;
+  background: var(--bg);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ---------- 外壳：三行栅格（标题栏 / 内容 / Tab 栏） ---------- */
+
+:root[data-platform="android"] .app-root {
+  grid-template-rows:
+    calc(var(--android-titlebar-h) + var(--android-inset-top))
+    1fr
+    calc(var(--android-tabbar-h) + var(--android-inset-bottom));
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "titlebar"
+    "content"
+    "nav";
+  height: 100dvh;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+:root[data-platform="android"] .titlebar {
+  grid-area: titlebar;
+  height: auto;
+  min-height: 0;
+  padding: var(--android-inset-top) var(--android-page-pad) 0;
+  align-items: center;
+  background: var(--android-glass-titlebar);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+  border-bottom: none;
+  box-shadow: none;
+}
+
+:root[data-platform="android"] .brand-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* 桌面专属元素：Android 不渲染对应 DOM，这里再兜一层样式保险 */
+:root[data-platform="android"] .brand-sub,
+:root[data-platform="android"] .identity,
+:root[data-platform="android"] #info-btn,
+:root[data-platform="android"] .info-pop,
+:root[data-platform="android"] .win-controls,
+:root[data-platform="android"] .statusbar {
+  display: none !important;
+}
+
+/* 不支持 backdrop-filter 时退回纯色分层（data-blur 由 platform.ts 写入） */
+:root[data-platform="android"][data-blur="0"] .titlebar,
+:root[data-platform="android"][data-blur="0"] .nav {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--bg);
+}
+
+/* ---------- 底部 Tab 栏 ---------- */
+
+:root[data-platform="android"] .nav {
+  grid-area: nav;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-around;
+  padding: 0 4px var(--android-inset-bottom);
+  background: var(--android-glass-tabbar);
+  -webkit-backdrop-filter: blur(40px) saturate(1.6);
+  backdrop-filter: blur(40px) saturate(1.6);
+  border-right: none;
+  border-top: 1px solid var(--border);
+}
+
+:root[data-platform="android"] .nav-indicator {
+  display: none;
+}
+
+:root[data-platform="android"] .nav-item {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 0 2px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+:root[data-platform="android"] .nav-item svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.6;
+}
+
+/* 选中态的胶囊指示器（隐藏了 .nav-indicator，改用 .nav-ico 底色） */
+:root[data-platform="android"] .nav-ico {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 30px;
+  border-radius: 15px;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+
+:root[data-platform="android"] .nav-item[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 500;
+  background: transparent;
+}
+
+:root[data-platform="android"] .nav-item[aria-current="page"] .nav-ico {
+  background: var(--android-tab-indicator);
+}
+
+/* ---------- 内容区 ---------- */
+
+:root[data-platform="android"] .content {
+  grid-area: content;
+  padding: var(--android-page-pad);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+}
+
+:root[data-platform="android"] .content::-webkit-scrollbar {
+  display: none;
+}
+
+:root[data-platform="android"] .page-title {
+  font-size: 22px;
+  line-height: 28px;
+}
+
+@media (min-width: 600px) {
+  :root[data-platform="android"] .page-title {
+    font-size: 26px;
+    line-height: 32px;
+  }
+}
+
+/* ---------- 触摸尺寸 ---------- */
+
+:root[data-platform="android"] .btn {
+  height: var(--android-control-h);
+  min-height: var(--android-control-h);
+  padding: 0 16px;
+  gap: 8px;
+}
+
+:root[data-platform="android"] .btn.small {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+:root[data-platform="android"] .icon-btn {
+  width: var(--android-control-h);
+  height: var(--android-control-h);
+}
+
+:root[data-platform="android"] .input,
+:root[data-platform="android"] .dd-btn,
+:root[data-platform="android"] .stepper {
+  height: var(--android-control-h);
+}
+
+:root[data-platform="android"] .input {
+  padding: 0 12px;
+  font-size: 15px;
+}
+
+:root[data-platform="android"] .stepper .step {
+  width: 44px;
+  height: calc(var(--android-control-h) - 2px);
+}
+
+:root[data-platform="android"] .list-row {
+  min-height: var(--android-list-row-h);
+  padding: 8px 12px;
+}
+
+:root[data-platform="android"] .device {
+  padding: 12px;
+}
+
+:root[data-platform="android"] .device .send {
+  height: 40px;
+  min-width: 64px;
+  font-size: 13px;
+}
+
+:root[data-platform="android"] .switch {
+  min-height: 48px;
+}
+
+:root[data-platform="android"] .switch .track {
+  width: 44px;
+  height: 24px;
+}
+
+:root[data-platform="android"] .switch input:checked + .track::after {
+  transform: translateX(20px);
+}
+
+:root[data-platform="android"] .range {
+  height: 32px;
+}
+
+:root[data-platform="android"] .progress {
+  height: 8px;
+}
+
+:root[data-platform="android"] .progress.large {
+  height: 10px;
+}
+
+/* hover 复位（触摸设备没有 hover，避免点击后样式粘住） */
+@media (hover: none) {
+  :root[data-platform="android"] .btn:hover {
+    background: var(--surface);
+    border-color: var(--border-strong);
+  }
+
+  :root[data-platform="android"] .btn.primary:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  :root[data-platform="android"] .card:hover,
+  :root[data-platform="android"] .device:hover {
+    box-shadow: var(--shadow-card);
+  }
+
+  :root[data-platform="android"] .device:hover {
+    border-color: var(--border);
+    background: var(--surface);
+  }
+
+  :root[data-platform="android"] .list-row:hover,
+  :root[data-platform="android"] .nav-item:hover {
+    background: transparent;
+  }
+
+  :root[data-platform="android"] .history-row.clickable:hover {
+    background: transparent;
+  }
+}
+
+/* ---------- 发送页：拖放区换成「选择文件/文件夹」面板 ---------- */
+
+:root[data-platform="android"] .send-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--android-gap);
+  max-width: none;
+}
+
+:root[data-platform="android"] .device-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--android-gap);
+}
+
+:root[data-platform="android"] .dropzone {
+  display: none;
+}
+
+:root[data-platform="android"] .pick-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-platform="android"] .pick-panel .btn {
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  justify-content: center;
+  font-size: 15px;
+}
+
+:root[data-platform="android"] .pick-panel .hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* 取消卡片的固定高度限制，交给整页滚动 */
+:root[data-platform="android"] .staged-card {
+  min-height: 0;
+  max-height: none;
+}
+
+:root[data-platform="android"] .staged-list,
+:root[data-platform="android"] .device-list {
+  max-height: none;
+  overflow: visible;
+}
+
+/* 列表内在小按钮在触摸端隐去，改为长按 ActionSheet */
+:root[data-platform="android"] .staged-list .btn {
+  display: none;
+}
+
+/* ---------- 接收 / 历史 / 设置 / 诊断 ---------- */
+
+:root[data-platform="android"] .receive-view,
+:root[data-platform="android"] .history-view,
+:root[data-platform="android"] .settings-view,
+:root[data-platform="android"] .diagnostics-view {
+  max-width: none;
+}
+
+:root[data-platform="android"] .save-row {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:root[data-platform="android"] .save-row .grow {
+  flex-basis: 100%;
+}
+
+:root[data-platform="android"] .grid-2 {
+  grid-template-columns: 1fr;
+}
+
+:root[data-platform="android"] .diag-row {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+:root[data-platform="android"] .diag-value {
+  overflow-wrap: anywhere;
+}
+
+:root[data-platform="android"] .settings-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  padding: 12px 0 4px;
+  background: var(--bg);
+}
+
+:root[data-platform="android"] .settings-actions .btn {
+  width: 100%;
+}
+
+:root[data-platform="android"] .history-row {
+  padding: 12px;
+}
+
+:root[data-platform="android"] .history-detail {
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 4px 12px 16px 28px;
+}
+
+/* ---------- 底部 ActionSheet ---------- */
+
+:root[data-platform="android"] .sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1350;
+  background: var(--android-scrim);
+  animation: lp-fade-in 160ms var(--ease-decelerate);
+}
+
+:root[data-platform="android"] .sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 8px calc(16px + var(--android-inset-bottom));
+  background: var(--surface);
+  border-radius: var(--android-sheet-radius) var(--android-sheet-radius) 0 0;
+  box-shadow: var(--android-sheet-shadow);
+  animation: lp-android-sheet-up 200ms var(--ease-decelerate);
+}
+
+:root[data-platform="android"] .sheet-handle {
+  width: 32px;
+  height: 4px;
+  margin: 4px auto 8px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+:root[data-platform="android"] .sheet-title {
+  padding: 0 8px 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+
+:root[data-platform="android"] .sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  text-align: start;
+  cursor: pointer;
+}
+
+:root[data-platform="android"] .sheet-item:active {
+  background: var(--android-state-pressed-strong);
+}
+
+:root[data-platform="android"] .sheet-item.danger {
+  color: var(--danger);
+}
+
+:root[data-platform="android"] .sheet-item .tick {
+  margin-left: auto;
+  color: var(--accent);
+}
+
+@keyframes lp-android-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Toast（Android 无状态栏，浮在 Tab 栏上方） ---------- */
+
+:root[data-platform="android"] .toast {
+  left: 50%;
+  bottom: calc(var(--android-tabbar-h) + var(--android-inset-bottom) + 12px);
+  max-width: calc(100% - 32px);
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+  transition:
+    opacity var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+  pointer-events: none;
+}
+
+:root[data-platform="android"] .toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- 平板：600–839dp 左侧 Rail ---------- */
+
+@media (min-width: 600px) and (max-width: 839.98px) {
+  :root[data-platform="android"] .app-root {
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-rows: calc(var(--android-titlebar-h) + var(--android-inset-top)) minmax(0, 1fr);
+    grid-template-areas:
+      "titlebar titlebar"
+      "nav content";
+    padding-bottom: var(--android-inset-bottom);
+  }
+
+  :root[data-platform="android"] .nav {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 8px 0;
+    border-top: none;
+    border-right: 1px solid var(--border);
+  }
+
+  :root[data-platform="android"] .nav-item {
+    flex: 0 0 auto;
+    min-height: 64px;
+    justify-content: center;
+  }
+
+  :root[data-platform="android"] .content {
+    padding-bottom: calc(var(--android-page-pad) + var(--android-inset-bottom));
+  }
+}
+
+/* ---------- 大屏：>=840dp Rail + 发送页两列 ---------- */
+
+@media (min-width: 840px) {
+  :root[data-platform="android"] .app-root {
+    grid-template-columns: 80px minmax(0, 1fr);
+    grid-template-rows: calc(var(--android-titlebar-h) + var(--android-inset-top)) minmax(0, 1fr);
+    grid-template-areas:
+      "titlebar titlebar"
+      "nav content";
+    padding-bottom: var(--android-inset-bottom);
+  }
+
+  :root[data-platform="android"] .nav {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 8px 0;
+    border-top: none;
+    border-right: 1px solid var(--border);
+  }
+
+  :root[data-platform="android"] .nav-item {
+    flex: 0 0 auto;
+    min-height: 64px;
+  }
+
+  :root[data-platform="android"] .content {
+    padding-bottom: calc(var(--android-page-pad) + var(--android-inset-bottom));
+  }
+
+  :root[data-platform="android"] .send-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      "head head"
+      "pick devices"
+      "staged direct";
+    align-items: start;
+    gap: var(--space-4);
+  }
+
+  :root[data-platform="android"] .send-grid > .page-head {
+    grid-area: head;
+  }
+
+  :root[data-platform="android"] .pick-panel {
+    grid-area: pick;
+  }
+
+  :root[data-platform="android"] .staged-card {
+    grid-area: staged;
+  }
+
+  :root[data-platform="android"] .device-panel {
+    display: contents;
+  }
+
+  :root[data-platform="android"] #devices-card {
+    grid-area: devices;
+  }
+
+  :root[data-platform="android"] .card-direct {
+    grid-area: direct;
+  }
+}

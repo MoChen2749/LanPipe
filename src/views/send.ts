@@ -1,6 +1,9 @@
-import { getState, subscribe } from "../state/store";
+import { getState, subscribe, type StagedSummary } from "../state/store";
 import { clear, el, icons, svgIcon, withFocusPreserved } from "../ui/dom";
 import { t } from "../i18n";
+import { isAndroid } from "../platform";
+import { actionSheet } from "../ui/sheet";
+import { longPress } from "../ui/touch";
 import { baseName, fmtBytes, fmtCount } from "../ui/format";
 import {
   clearStaged,
@@ -41,27 +44,46 @@ function build(rerender: () => void): HTMLElement {
     el("p", { class: "page-sub", text: t("send.subtitle") }),
   );
 
-  const dropzone = el(
-    "div",
-    { class: "dropzone", id: "dropzone" },
-    el("div", { class: "icon" }, svgIcon(icons.up, 32)),
-    el("div", { class: "title", text: t("send.drop.title") }),
-    el("div", { class: "hint", text: t("send.drop.hint") }),
-    el(
-      "div",
-      { class: "actions" },
-      el(
-        "button",
-        { class: "btn primary", type: "button", onclick: () => void pickFiles() },
-        t("send.pickFiles"),
-      ),
-      el(
-        "button",
-        { class: "btn", type: "button", onclick: () => void pickFolder() },
-        t("send.pickFolder"),
-      ),
-    ),
-  );
+  // Android 没有桌面拖放：换成整块「选择文件 / 选择文件夹」面板
+  const dropzone = isAndroid
+    ? el(
+        "section",
+        { class: "pick-panel", id: "dropzone" },
+        el(
+          "button",
+          { class: "btn primary", type: "button", onclick: () => void pickFiles() },
+          svgIcon(icons.file, 18),
+          t("send.pickFiles"),
+        ),
+        el(
+          "button",
+          { class: "btn", type: "button", onclick: () => void pickFolder() },
+          svgIcon(icons.folder, 18),
+          t("send.pickFolder"),
+        ),
+        el("p", { class: "hint", text: t("send.drop.hint") }),
+      )
+    : el(
+        "div",
+        { class: "dropzone", id: "dropzone" },
+        el("div", { class: "icon" }, svgIcon(icons.up, 32)),
+        el("div", { class: "title", text: t("send.drop.title") }),
+        el("div", { class: "hint", text: t("send.drop.hint") }),
+        el(
+          "div",
+          { class: "actions" },
+          el(
+            "button",
+            { class: "btn primary", type: "button", onclick: () => void pickFiles() },
+            t("send.pickFiles"),
+          ),
+          el(
+            "button",
+            { class: "btn", type: "button", onclick: () => void pickFolder() },
+            t("send.pickFolder"),
+          ),
+        ),
+      );
 
   const stagedCard = el(
     "section",
@@ -91,34 +113,7 @@ function build(rerender: () => void): HTMLElement {
       ? el(
           "div",
           { class: "list staged-list" },
-          ...staged.map((path) =>
-            el(
-              "div",
-              { class: "list-row" },
-              svgIcon(icons.folder, 18),
-              el(
-                "div",
-                { class: "grow" },
-                el("div", { class: "name", text: baseName(path) }),
-                el("div", {
-                  class: "meta",
-                  title: path,
-                  text: summary
-                    ? `${fmtCount(summary.files, "文件")} · ${fmtBytes(summary.bytes)}`
-                    : path,
-                }),
-              ),
-              el(
-                "button",
-                {
-                  class: "btn ghost small",
-                  type: "button",
-                  onclick: () => removeStaged(path),
-                },
-                t("send.remove"),
-              ),
-            ),
-          ),
+          ...staged.map((path) => stagedRow(path, summary)),
         )
       : el("div", { class: "empty", text: t("send.staged.empty") }),
     el(
@@ -226,10 +221,47 @@ function build(rerender: () => void): HTMLElement {
   return el("div", { class: "send-grid" }, head, dropzone, stagedCard, sideCol);
 }
 
+function stagedRow(path: string, summary: StagedSummary | null): HTMLElement {
+  const row = el(
+    "div",
+    { class: "list-row" },
+    svgIcon(icons.folder, 18),
+    el(
+      "div",
+      { class: "grow" },
+      el("div", { class: "name", text: baseName(path) }),
+      el("div", {
+        class: "meta",
+        title: path,
+        text: summary ? `${fmtCount(summary.files, "文件")} · ${fmtBytes(summary.bytes)}` : path,
+      }),
+    ),
+    el(
+      "button",
+      {
+        class: "btn ghost small",
+        type: "button",
+        onclick: () => removeStaged(path),
+      },
+      t("send.remove"),
+    ),
+  );
+  // Android：长按条目弹出移除/清空面板（触摸端按钮更小、易误触）
+  if (isAndroid) {
+    longPress(row, () =>
+      actionSheet(null, [
+        { label: t("sheet.remove"), danger: true, onSelect: () => removeStaged(path) },
+        { label: t("sheet.clearAll"), onSelect: () => clearStaged() },
+      ]),
+    );
+  }
+  return row;
+}
+
 function deviceRow(peer: { name: string; addr: string; shortId: string; id: string }): HTMLElement {
   const state = getState();
   const disabled = state.staged.length === 0;
-  return el(
+  const row = el(
     "div",
     { class: "device", title: `完整 ID：${peer.id}` },
     el("div", { class: "icon" }, svgIcon(icons.device, 18)),
@@ -256,6 +288,22 @@ function deviceRow(peer: { name: string; addr: string; shortId: string; id: stri
       t("devices.send"),
     ),
   );
+  if (isAndroid) {
+    longPress(row, () =>
+      actionSheet(peer.name, [
+        {
+          label: t("sheet.copyAddr"),
+          onSelect: () => {
+            void navigator.clipboard
+              .writeText(peer.addr)
+              .then(() => toast(t("toast.copied", { text: peer.addr })))
+              .catch((err) => toast(String(err)));
+          },
+        },
+      ]),
+    );
+  }
+  return row;
 }
 
 export function notifySendHint(text: string): void {

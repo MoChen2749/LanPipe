@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 基础网络：局域网 TCP 直传 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 网络状态/局域网发现 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- UDP 多播发现需要持有 MulticastLock -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- 前台服务（dataSync）：保持后台传输 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Android 13+ 前台服务通知 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -9,6 +20,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.lanpipe"
+        android:enableOnBackInvokedCallback="true"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
@@ -23,6 +35,12 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- dataSync 前台服务：后台传输保活 -->
+        <service
+            android:name=".LanPipeSyncService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <provider
           android:name="androidx.core.content.FileProvider"

@@ -83,6 +83,10 @@ export const api = {
   scanLastOctet: (octet: number, port?: number) =>
     invoke<PeerView[]>("scan_last_octet", { octet, port }),
   revealPath: (path: string) => invoke<void>("reveal_path", { path }),
+  /** Android：SAF 多选文件，原生侧把 content:// 拷到应用缓存后返回本地绝对路径。 */
+  androidPickFiles: () => invoke<string[]>("android_pick_files"),
+  /** Android：SAF 选择目录，原生侧整棵目录树拷到应用缓存后返回本地绝对路径。 */
+  androidPickFolder: () => invoke<string[]>("android_pick_folder"),
   backdropInfo: () => invoke<string>("backdrop_info"),
   backdropApply: (mode: string) => invoke<string>("backdrop_apply", { mode }),
   windowShadow: () => invoke<boolean>("window_shadow"),

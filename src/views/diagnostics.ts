@@ -2,6 +2,7 @@ import { el } from "../ui/dom";
 import { t } from "../i18n";
 import { api } from "../api/tauri";
 import { toast } from "../actions";
+import { isAndroid } from "../platform";
 
 interface InterfaceRow {
   name: string;
@@ -74,12 +75,18 @@ export function mountDiagnostics(container: HTMLElement): () => void {
         row(t("diagnostics.version"), data.version),
         row(t("diagnostics.osBuild"), String(data.osBuild)),
     row(t("diagnostics.builtAt"), data.builtAt ? new Date(data.builtAt * 1000).toLocaleString() : "-"),
-        row(t("diagnostics.webview"), data.webviewVersion || "-"),
-        row(
-          t("diagnostics.transparency"),
-          data.transparencyRegressed ? t("diagnostics.transparencyFallback") : t("diagnostics.transparencyOk"),
-        ),
-        row(t("diagnostics.backdrop"), data.backdrop || "none"),
+        ...(isAndroid
+          ? []
+          : [
+              row(t("diagnostics.webview"), data.webviewVersion || "-"),
+              row(
+                t("diagnostics.transparency"),
+                data.transparencyRegressed
+                  ? t("diagnostics.transparencyFallback")
+                  : t("diagnostics.transparencyOk"),
+              ),
+              row(t("diagnostics.backdrop"), data.backdrop || "none"),
+            ]),
         row(t("diagnostics.shortId"), `#${data.shortId ?? "000"}`),
         row(t("diagnostics.deviceId"), data.deviceId),
         row(t("diagnostics.config"), data.configPath ?? "-"),
@@ -100,7 +107,10 @@ export function mountDiagnostics(container: HTMLElement): () => void {
         row(t("diagnostics.ports"), `UDP ${data.listen.udp ?? "-"} / TCP ${data.listen.tcp ?? "-"}`),
         row(t("diagnostics.discovery"), data.discovery ? t("diagnostics.on") : t("diagnostics.off")),
         row(t("diagnostics.streams"), String(data.streams)),
-        row(t("diagnostics.firewall"), data.firewall ? t("settings.firewallOk") : t("settings.firewallNone")),
+        // 防火墙是 Windows 专属行
+        ...(isAndroid
+          ? []
+          : [row(t("diagnostics.firewall"), data.firewall ? t("settings.firewallOk") : t("settings.firewallNone"))]),
         row(t("diagnostics.downloadDir"), data.downloadDir),
       ),
       band(

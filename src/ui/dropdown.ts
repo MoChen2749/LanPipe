@@ -1,4 +1,6 @@
 import { el, icons, svgIcon } from "./dom";
+import { isAndroid } from "../platform";
+import { sheetSelect } from "./sheet";
 
 export interface DropdownOption {
   value: string;
@@ -18,6 +20,8 @@ export interface DropdownOptions {
  *
  * 弹出层挂在 document.body 并用 fixed 定位，
  * 避免卡片入场动画的 transform 造成层叠上下文、把浮层闷在卡片里。
+ *
+ * Android 分支改用底部 ActionSheet（触摸端浮层在窄屏上更容易点中）。
  */
 export function dropdown(opts: DropdownOptions): HTMLElement {
   let value = opts.value;
@@ -37,7 +41,7 @@ export function dropdown(opts: DropdownOptions): HTMLElement {
   if (opts.id) button.id = opts.id;
   if (opts.ariaLabel) button.setAttribute("aria-label", opts.ariaLabel);
 
-  const pop = el("div", { class: "dd-pop hidden", role: "listbox" }) as HTMLElement;
+  const root = el("div", { class: "dd" }, button);
   const optionButtons: HTMLButtonElement[] = [];
 
   const syncLabel = () => {
@@ -47,6 +51,33 @@ export function dropdown(opts: DropdownOptions): HTMLElement {
       option.setAttribute("aria-selected", String(index === activeIndex));
     });
   };
+
+  // ---------- Android：底部 Sheet 选择 ----------
+  if (isAndroid) {
+    button.setAttribute("aria-haspopup", "dialog");
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      sheetSelect({
+        title: opts.ariaLabel,
+        value,
+        options: opts.options,
+        onChange: (next) => {
+          value = next;
+          activeIndex = Math.max(
+            0,
+            opts.options.findIndex((option) => option.value === next),
+          );
+          syncLabel();
+          opts.onChange?.(next);
+        },
+      });
+    });
+    syncLabel();
+    return root;
+  }
+
+  // ---------- 桌面：自绘浮层 ----------
+  const pop = el("div", { class: "dd-pop hidden", role: "listbox" }) as HTMLElement;
 
   for (const [index, option] of opts.options.entries()) {
     const row = el(
@@ -155,7 +186,6 @@ export function dropdown(opts: DropdownOptions): HTMLElement {
 
   document.body.append(pop);
 
-  const root = el("div", { class: "dd" }, button);
   syncLabel();
 
   // 视图卸载时移除 portal 与监听，避免每次进入页面都残留一份弹出层/监听器

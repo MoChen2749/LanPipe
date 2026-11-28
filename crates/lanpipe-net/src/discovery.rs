@@ -66,20 +66,19 @@ pub async fn start_discovery(
     udp_port: u16,
     control_port: u16,
 ) -> Result<(DiscoveryHandle, mpsc::UnboundedReceiver<DiscoveryEvent>), String> {
-    let sock = socket2::Socket::new(
-        socket2::Domain::IPV4,
-        socket2::Type::DGRAM,
-        Some(socket2::Protocol::UDP),
-    )
-    .map_err(|e| format!("创建 UDP socket 失败: {e}"))?;
-    sock.set_reuse_address(true).ok();
-    sock.set_broadcast(true)
-        .map_err(|e| format!("开启广播失败: {e}"))?;
+    // 直接用 tokio 建 socket：本机 Android（模拟器与真机一致）上把 socket2 建好的 fd
+    // 交给 `UdpSocket::from_std` 会在 IO driver 注册阶段卡死，先用 tokio 自己建再改选项。
     let bind_addr: SocketAddr = SocketAddr::from(([0, 0, 0, 0], udp_port));
-    sock.bind(&bind_addr.into())
+    let udp = UdpSocket::bind(bind_addr)
+        .await
         .map_err(|e| format!("绑定 UDP {udp_port} 失败: {e}"))?;
-    let std_sock: std::net::UdpSocket = sock.into();
-    let udp = UdpSocket::from_std(std_sock).map_err(|e| format!("转为异步 socket 失败: {e}"))?;
+    {
+        let sref = socket2::SockRef::from(&udp);
+        sref.set_reuse_address(true).ok();
+        sref.set_broadcast(true)
+            .map_err(|e| format!("开启广播失败: {e}"))?;
+    }
+    #[cfg(not(target_os = "android"))]
     udp.set_multicast_loop_v4(true).ok();
     let group = Ipv4Addr::from(MULTICAST_GROUP);
     if let Err(e) = udp.join_multicast_v4(group, Ipv4Addr::UNSPECIFIED) {
@@ -87,9 +86,10 @@ pub async fn start_discovery(
         eprintln!("[lanpipe] 加入多播组失败(默认接口): {e}");
     }
     // 每块非回环网卡都加入多播组：Windows 上默认只挑一个接口，跨网段/VPN 多网卡时会漏收。
-    let local_ifaces = local_ipv4_ifaces();
-    for iface in &local_ifaces {
-        if let Err(e) = udp.join_multicast_v4(group, *iface) {
+    // Android 上默认接口的加入已覆盖全部流量，逐网卡重复加入会返回 EADDRINUSE。
+    #[cfg(not(target_os = "android"))]
+    for iface in local_ipv4_ifaces() {
+        if let Err(e) = udp.join_multicast_v4(group, iface) {
             eprintln!("[lanpipe] 加入多播组失败({iface}): {e}");
         }
     }

@@ -190,10 +190,23 @@ fn transfer_json(ev: &TransferEvent) -> serde_json::Value {
     }
 }
 
+/// 启动阶段埋点：桌面写日志文件，Android 额外打到 logcat（临时文件目录在 Android 上不可写）。
+fn trace(msg: &str) {
+    crate::log(msg);
+    #[cfg(target_os = "android")]
+    eprintln!("[lanpipe] {msg}");
+}
+
 /// 启动发现 + 接收监听（会先停掉旧实例）。
 pub async fn start(app: &AppHandle) -> Result<(), String> {
+    trace("net: start begin");
     stop(app);
+    trace("net: stop done");
     let cfg = crate::settings::snapshot(app)?;
+    trace(&format!(
+        "net: snapshot udp={} tcp={}",
+        cfg.listen.udp, cfg.listen.tcp
+    ));
     let (discovery, mut discovery_rx) = start_discovery(
         cfg.device_id.clone(),
         cfg.display_name.clone(),
@@ -201,11 +214,14 @@ pub async fn start(app: &AppHandle) -> Result<(), String> {
         cfg.listen.tcp,
     )
     .await?;
+    trace("net: discovery ready");
 
     let bind: std::net::SocketAddr = format!("0.0.0.0:{}", cfg.listen.tcp)
         .parse()
         .map_err(|e| format!("TCP 端口无效: {e}"))?;
+    trace(&format!("net: receiver binding {bind}"));
     let (receiver, mut transfer_rx) = start_receiver(bind, PathBuf::from(&cfg.download_dir)).await?;
+    trace("net: receiver ready");
 
     let app_disc = app.clone();
     let disc_task = tauri::async_runtime::spawn(async move {

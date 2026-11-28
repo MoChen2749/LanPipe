@@ -92,9 +92,22 @@ cargo build --release --features custom-protocol -p lanpipe
 | Linux（WSL2 Ubuntu 24.04） | CLI（静态 / musl） | 已在测试中验证；可从 Windows 交叉编译 | [docs/INSTALL.md](docs/INSTALL.md) §2.1 |
 | Linux 桌面 | GUI（单文件二进制） | WSLg 中构建、启动、中文渲染已验证 | [docs/INSTALL.md](docs/INSTALL.md) §2.2 |
 | macOS | GUI（app / dmg） | 未验证 | [docs/INSTALL.md](docs/INSTALL.md) §3 |
-| 移动端（Android / iOS） | — | 规划中 | M3 评估项 |
+| Android | GUI（APK） | 模拟器完成构建/启动/接收验证；真机未验证 | 见下方「Android 构建」 |
+| iOS | — | 未开始 | — |
 
 安装、源码构建、防火墙配置与常见问题的完整说明见 [docs/INSTALL.md](docs/INSTALL.md)。
+
+### Android 构建
+
+Android 端复用同一套 Rust 传输核心与前端，界面按 Fluent 2 观感重排为底部 5 项导航，桌面专属元素（标题栏、托盘、材质、防火墙、自动更新）在移动端隐藏。构建需要 JDK 17、Android SDK（compileSdk 37 / minSdk 24）与 NDK：
+
+```powershell
+cd apps/desktop/src-tauri
+npx tauri android build --apk --debug --target aarch64   # 真机（arm64）
+npx tauri android build --apk --debug --target x86_64    # 模拟器（x86_64）
+```
+
+产物在 `apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/debug/`。`adb install -r` 安装后即可收发文件；接收目录为应用外部私有目录（`Android/data/com.lanpipe.desktop/files/Download/LanPipe/`），选择发送文件走系统文件选择器并拷贝到缓存后再发送。详细验证记录见 [docs/mobile/android-verification.md](docs/mobile/android-verification.md)。
 
 ## 5. 使用说明
 

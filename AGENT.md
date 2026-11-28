@@ -733,3 +733,38 @@ Win10 用 Acrylic、Win11 用 Mica，观感差别很大，`src/styles/materials.
 - 截图方法（WSL 无 X 抓图能力时）：`Xvfb :99 -screen 0 1100x820x24 -extension GLX`，应用以 `setsid env DISPLAY=:99 GDK_BACKEND=x11 WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_GL=disable LIBGL_ALWAYS_SOFTWARE=1 ./dist-linux/lanpipe` 启动，再 `DISPLAY=:99 import -window root shot.png`；WSLg 直接抓 `:0` 会报 `Resource temporarily unavailable`。注意 bash 里 `"$@"` 必须放在 `env` 之后，写成命令前缀会导致 `command not found`。
 - CI：`ci.yml` 的 `linux` 作业（ubuntu-24.04）跑 deps、cli、`cargo test`、desktop 构建；`release.yml` 的 `linux` 作业（ubuntu-24.04）用 `CLI_TARGET=x86_64-unknown-linux-musl` 构建静态 CLI 与桌面二进制，复制为 `LanPipe_<tag>_x86_64-linux`、`lanpipe-cli_<tag>_x86_64-linux` 后追加到同一 Release，不再构建 deb。
 - 已知限制：WSL2 的 `wslrelay.exe` 占用 `127.0.0.1:53311`，本机测桌面接收端要用 LAN IP；Linux 桌面窗口为普通 GTK 外观，无 Mica/Acrylic。
+### 16.15 Android 端启动计划（2026-11-28）
+
+目标：在 Windows/macOS/Linux 之外增加 Android 客户端，复用现有 Rust 传输核心（crates/lanpipe-net + crates/lanpipe-proto），前端继续用 Tauri WebView 渲染，UI 保持 Fluent 2 观感而不是 Material 默认风格。调研结论见 docs/mobile/ANDROID-RESEARCH.md、docs/mobile/ANDROID-UI.md、docs/mobile/ANDROID-BUILD.md。
+
+**可行性结论**
+- Tauri v2（本机 CLI 2.12.5）已支持 Android：`tauri android init/dev/build/run`。传输核心无平台专属 API，可交叉编译；成本在桌面耦合隔离与原生 Kotlin 桥接。
+- 版本：JDK 17、compileSdk/targetSdk 37、minSdk 24、Gradle 9.6.1 wrapper（腾讯镜像）；SDK 根 `F:\Android\android-sdk`，NDK `30.0.14904198`（Tauri 推荐 27.0.12077973，若链接失败再降级）。
+- WebView 差异（关键）：Android 系统 WebView 不支持 `transparent`（tauri issue #9408，会白屏），无 Mica/Acrylic/无边框/托盘/单实例/updater；文件选择返回 `content://`；后台限制导致 WebView 约 5 分钟后定时器节流，进度必须由 Rust 侧推送。
+- 插件可用性：dialog 可用；single-instance、updater、autostart、tray 仅桌面，需要 `#[cfg(desktop)]` 隔离。
+
+**施工拆分**
+- task-11 核心接入：`[lib] crate-type = ["staticlib","cdylib","rlib"]` + `lib.rs`（`#[cfg_attr(mobile, tauri::mobile_entry_point)]`）+ `mobile.rs` 钩子 + 桌面能力 cfg 门控。
+- task-12 前端适配：`src/platform.ts`、`src/styles/android.css`、`src/ui/android-insets.ts`、`src/ui/sheet.ts`、底部 5 项 Tab、桌面元素隐藏、i18n 新增 key。
+- task-13 原生桥接：Manifest 权限（多播/通知/前台服务）、`MainActivity` edge-to-edge 与返回键、`MulticastLock`、前台服务、SAF 选择后拷入私有目录再交给 `start_send`。
+
+**风险**
+- Android 16 本地网络权限（`RESTRICT_LOCAL_NETWORK`）可能影响局域网发现与直连；
+- 各厂商 ROM 的多播/省电策略不稳定；Doze 与前台服务时限使「接收端常驻」不可依赖；
+- `content://` 与现有 `std::fs` 管线冲突（SAF 方案 R1），接收目录需要迁到应用私有目录；
+- 模拟器可验证基本收发，真实设备仍需用户接入。
+
+**实现结果（2026-11-29）**
+
+- 核心与前端：`apps/desktop/src-tauri/src/lib.rs`（`run()` + 桌面能力全部 `#[cfg(desktop)]`）、`src/mobile.rs`（移动 setup + Android 桥接命令）；`src/platform.ts`、`src/styles/android.css`、`src/ui/{android-insets,sheet,touch}.ts`；底部 5 项 Tab，桌面路径整体进 `if (isDesktop)`。
+- 原生桥接（Kotlin）：`gen/android/app/src/main/java/com/lanpipe/desktop/` 下 `LanPipeNativePlugin.kt`、`LanPipeSyncService.kt`、重写的 `MainActivity.kt`；Manifest 声明 `INTERNET`、`ACCESS_NETWORK_STATE`、`ACCESS_WIFI_STATE`、`CHANGE_WIFI_MULTICAST_STATE`、`POST_NOTIFICATIONS`、`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_DATA_SYNC`；命令 `android_insets`、`android_pick_files`、`android_pick_folder`、`android_open_path`、`android_foreground_start/stop`、`android_exit`。
+- SAF：`ACTION_OPEN_DOCUMENT` / `ACTION_OPEN_DOCUMENT_TREE` 选中后递归拷贝到 `cacheDir/imports/<ts>/`（目录深度上限 24），把绝对路径交给 `stagePaths` 发送；前端 `actions.ts` 优先走原生命令，失败回退 dialog 插件。
+- 关键修复：Android 上把 `socket2` 建好的 UDP fd 交给 `tokio::net::UdpSocket::from_std` 会在 IO driver 注册阶段永久卡住（`net::start` 停在 `discovery`，无任何错误日志，模拟器 aarch64 与 x86_64 均复现）；改为 `UdpSocket::bind(...).await` 后用 `socket2::SockRef` 设置 `SO_REUSEADDR`/`SO_BROADCAST`，并跳过 Android 上逐网卡重复 join（`EADDRINUSE`）。
+- 验证（模拟器 `lianyu-api35`，API 35）：
+  - APK 构建成功（arm64 与 x86_64），`adb install -r` 启动无崩溃，`net start` 耗时 17 ms；
+  - SAF 端到端：选 2 个文件 → `cache/imports/1795885629533/` → 界面「待发送 · 2 项」；
+  - 前台服务 `isForeground=true foregroundId=1001 types=0x00000001`；`android_insets` 返回 `{"top":49,"bottom":24,"ime":0}`；返回键、`android_exit` 正常；
+  - 端到端接收：Windows CLI `lanpipe-cli send 127.0.0.1:15311 <file>`（`adb forward tcp:15311 tcp:53311`）→ Android 接收页显示「已完成 100% 1/1 文件 488 KiB」，落盘 `Android/data/com.lanpipe.desktop/files/Download/LanPipe/LanPipe-<ts>/`；
+  - 截图：`docs/mobile/android-emulator.png`（发送页）、`docs/mobile/android-receive.png`（接收完成）。完整记录见 `docs/mobile/android-verification.md`。
+- 构建环境（本机沙箱必需）：`CARGO_HOME=F:\Projects\.lanpipe-build\cargo-home`、`GRADLE_USER_HOME=...\gradle-home`、`TEMP=...\tmp`、`ANDROID_USER_HOME=...\android-home`（只设这一个）；`ANDROID_HOME`/`NDK_HOME` 见 §16.15 上文。
+- 已知限制：SAF 为拷贝语义（大文件有耗时与空间成本）；前台服务目前是骨架（未承载真实传输）；移动端无 Mica/Acrylic、无托盘；模拟器上多播发现不可用（真机需复验）；Android 16 本地网络权限未适配；未做真机与签名发布。

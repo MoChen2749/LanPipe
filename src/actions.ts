@@ -12,6 +12,7 @@ import {
   setTransfer,
 } from "./state/store";
 import { t } from "./i18n";
+import { isAndroid } from "./platform";
 import { baseName } from "./ui/format";
 
 let toastHandler: (text: string) => void = () => undefined;
@@ -74,12 +75,30 @@ export function removeStaged(path: string): void {
 }
 
 export async function pickFiles(): Promise<void> {
+  if (isAndroid) {
+    try {
+      const paths = await api.androidPickFiles();
+      if (paths.length > 0) await stagePaths(paths);
+      return;
+    } catch (err) {
+      console.warn("[lanpipe] android_pick_files failed, fallback to dialog plugin", err);
+    }
+  }
   const picked = await open({ multiple: true, directory: false });
   if (!picked) return;
   await stagePaths(Array.isArray(picked) ? picked : [picked]);
 }
 
 export async function pickFolder(): Promise<void> {
+  if (isAndroid) {
+    try {
+      const paths = await api.androidPickFolder();
+      if (paths.length > 0) await stagePaths(paths);
+      return;
+    } catch (err) {
+      console.warn("[lanpipe] android_pick_folder failed, fallback to dialog plugin", err);
+    }
+  }
   const picked = await open({ multiple: false, directory: true });
   if (!picked) return;
   await stagePaths(Array.isArray(picked) ? picked : [picked]);

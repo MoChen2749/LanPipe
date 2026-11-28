@@ -1,814 +1,848 @@
-<?xml version="1.0" encoding="utf-8"?>
-
-
-
-<!-- LanPipe UI 文案（中文）。新增语言：复制本文件为 <locale>.xml，在 src/i18n/index.ts 注册。 -->
-
-
-
-<resources lang="zh-CN">
-
-
-
-  <!-- 应用 -->
-
-
-
-  <string key="app.name">LanPipe</string>
-
-
-
-  <string key="app.subtitle">局域网传输</string>
-
-
-
-    <string key="window.minimize">最小化</string>
-
-
-
-  <string key="window.maximize">最大化</string>
-
-
-
-  <string key="window.restore">向下还原</string>
-
-
-
-  <string key="window.close">关闭</string>
-
-
-
-<string key="app.version">版本 {version}</string>
-
-
-
-  <string key="identity.local">本机 · {name}</string>
-
-
-
-
-
-
-
-  <!-- 导航 -->
-
-
-
-  <string key="nav.send">发送</string>
-
-
-
-  <string key="nav.receive">接收</string>
-
-
-
-  <string key="nav.history">历史</string>
-
-
-
-  <string key="nav.diagnostics">诊断</string>
-
-
-
-  <string key="diagnostics.title">诊断</string>
-
-
-
-  <string key="diagnostics.overview">概览</string>
-
-
-
-  <string key="diagnostics.network">网络</string>
-
-
-
-  <string key="diagnostics.peers">附近设备</string>
-
-
-
-  <string key="diagnostics.version">版本</string>
-
-
-
-  <string key="diagnostics.osBuild">系统 Build</string>
-
-
-
-  <string key="diagnostics.builtAt">构建时间</string>
-
-
-
-        <string key="diagnostics.webview">WebView2 版本</string>
-
-
-
-    <string key="diagnostics.transparency">窗口透明</string>
-
-
-
-    <string key="diagnostics.transparencyOk">可用</string>
-
-
-
-    <string key="diagnostics.transparencyFallback">运行时缺陷，已回退纯色</string>
-
-
-
-    <string key="diagnostics.backdrop">窗口材质</string>
-
-
-
-  <string key="diagnostics.shortId">短 ID</string>
-
-
-
-  <string key="diagnostics.deviceId">完整 ID</string>
-
-
-
-  <string key="diagnostics.config">配置文件</string>
-
-
-
-  <string key="diagnostics.stateDir">状态目录</string>
-
-
-
-  <string key="diagnostics.journals">个续传记录</string>
-
-
-
-  <string key="diagnostics.ports">监听端口</string>
-
-
-
-  <string key="diagnostics.discovery">局域网发现</string>
-
-
-
-  <string key="diagnostics.streams">并发流</string>
-
-
-
-  <string key="diagnostics.firewall">防火墙</string>
-
-
-
-  <string key="diagnostics.downloadDir">接收目录</string>
-
-
-
-  <string key="diagnostics.on">已开启</string>
-
-
-
-  <string key="diagnostics.off">已关闭</string>
-
-
-
-  <string key="diagnostics.noInterface">没有可用网卡</string>
-
-
-
-  <string key="diagnostics.noPeers">暂无设备</string>
-
-
-
-  <string key="diagnostics.refresh">刷新</string>
-
-
-
-  <string key="diagnostics.copy">复制诊断信息</string>
-
-
-
-  <string key="diagnostics.copied">诊断信息已复制</string>
-
-
-
-  <string key="diagnostics.error">诊断失败</string>
-
-
-
-  <string key="diagnostics.errorHint">错误信息</string>
-
-
-
-  <string key="nav.settings">设置</string>
-
-
-
-
-
-
-
-  <!-- 状态栏 -->
-
-
-
-  <string key="status.ready">就绪</string>
-
-
-
-  <string key="status.discovering">发现中 · {count} 台设备</string>
-
-
-
-  <string key="status.sending">正在发送</string>
-
-
-
-  <string key="status.receiving">正在接收</string>
-
-
-
-  <string key="status.done">已完成</string>
-
-
-
-  <string key="status.failed">传输失败</string>
-
-
-
-
-
-
-
-  <!-- 发送页 -->
-
-
-
-  <string key="send.title">发送</string>
-
-
-
-  <string key="send.subtitle">选择文件或文件夹，再指定设备</string>
-
-
-
-  <string key="send.drop.title">拖入文件或文件夹</string>
-
-
-
-  <string key="send.drop.hint">支持多选 · 目录保留原结构</string>
-
-
-
-  <string key="send.pickFiles">选择文件</string>
-
-
-
-  <string key="send.pickFolder">选择文件夹</string>
-
-
-
-  <string key="send.staged.empty">尚未选择内容</string>
-
-
-
-  <string key="send.staged.title">待发送 · {count} 项 · {size}</string>
-
-
-
-  <string key="send.clear">清空</string>
-
-
-
-  <string key="send.remove">移除</string>
-
-
-
-  <string key="send.primary">选择设备发送</string>
-
-
-
-  <string key="send.primaryHint">也可点击右侧设备卡片直接发送</string>
-
-
-
-  <string key="send.empty">暂无待发送内容</string>
-
-
-
-
-
-
-
-  <!-- 设备 -->
-
-
-
-  <string key="devices.title">附近设备</string>
-
-
-
-  <string key="devices.refresh">刷新</string>
-
-
-
-  <string key="devices.empty">未发现设备</string>
-
-
-
-  <string key="devices.emptyHint">点击刷新，或使用 IP 直连</string>
-
-
-
-  <string key="devices.online">在线</string>
-
-
-
-  <string key="devices.idle">空闲</string>
-
-
-
-  <string key="devices.send">发送</string>
-
-
-
-
-
-
-
-  <!-- IP 直连 -->
-
-
-
-  <string key="direct.title">IP 直连</string>
-
-
-
-  <string key="direct.placeholder">只输短 ID，如 005</string>
-
-
-
-  <string key="direct.connect">连接</string>
-
-
-
-  <string key="direct.hint">短 ID 扫描本机所有子网，或输完整 IP[:端口]</string>
-
-
-
-  <string key="direct.invalid">格式不正确：请输入短 ID 或 IP[:端口]</string>
-
-
-
-  <string key="direct.scanning">正在扫描 {target}…</string>
-
-
-
-  <string key="direct.found">发现 {count} 台设备</string>
-
-
-
-  <string key="direct.none">未发现设备</string>
-
-
-
-
-
-
-
-  <!-- 接收页 -->
-
-
-
-  <string key="receive.title">接收</string>
-
-
-
-  <string key="receive.subtitle">本机设备名 {name} · 端口 {port}</string>
-
-
-
-  <string key="receive.idle">等待发送端连接…</string>
-
-
-
-  <string key="receive.idleHint">接收端会在后台自动接收，无需操作</string>
-
-
-
-  <string key="receive.incomplete.title">未完成传输</string>
-
-
-
-  <string key="receive.incomplete.desc">来自 {name} · {done}/{total} 文件（{percent}%）</string>
-
-
-
-  <string key="receive.incomplete.hint">重新发送同一目录即可自动续传</string>
-
-
-
-  <string key="receive.current.from">来自 {name}</string>
-
-
-
-  <string key="receive.current.files">{done} / {total} 文件</string>
-
-
-
-  <string key="receive.current.bytes">{done} / {total}</string>
-
-
-
-  <string key="receive.current.speed">{speed} · 剩余 {eta}</string>
-
-
-
-  <string key="receive.current.open">打开接收文件夹</string>
-
-
-
-  <string key="receive.saved.title">保存到</string>
-
-
-
-  <string key="receive.open">打开</string>
-
-
-
-  <string key="receive.change">更改</string>
-
-
-
-  <string key="receive.recent.title">最近接收</string>
-
-
-
-  <string key="receive.recent.all">全部</string>
-
-
-
-
-
-
-
-  <!-- 历史页 -->
-
-
-
-  <string key="history.title">历史</string>
-
-
-
-  <string key="history.empty">暂无传输记录</string>
-
-
-
-  <string key="history.direction">方向</string>
-
-
-
-  <string key="history.peer">设备</string>
-
-
-
-  <string key="history.size">内容</string>
-
-
-
-  <string key="history.time">时间</string>
-
-
-
-  <string key="history.state">状态</string>
-
-
-
-  <string key="history.reason">原因</string>
-
-
-
-  <string key="history.emptyHint">发送或接收完成后会记录在这里</string>
-
-
-
-  <string key="receive.emptyHint">接收端在后台待命，收到请求会自动开始</string>
-
-
-
-  <string key="history.done">完成</string>
-
-
-
-  <string key="history.interrupted">已中断</string>
-
-
-
-  <string key="history.send">发送</string>
-
-
-
-  <string key="history.receive">接收</string>
-
-
-
-  <string key="history.meta">{files} 个文件 · {size}</string>
-
-
-
-
-
-
-
-  <!-- 设置页 -->
-
-
-
-  <string key="settings.title">设置</string>
-
-
-
-  <string key="settings.group.device">设备</string>
-
-
-
-  <string key="settings.group.transfer">传输</string>
-
-
-
-  <string key="settings.group.network">网络</string>
-
-
-
-  <string key="settings.group.appearance">外观与语言</string>
-
-
-
-  <string key="settings.group.about">关于</string>
-
-
-
-  <string key="settings.group.startup">启动</string>
-
-
-
-  <string key="settings.autostart">开机时启动 LanPipe</string>
-
-
-
-  <string key="settings.autostartHint">只影响当前用户，可在任务管理器启动项里关闭</string>
-
-
-
-  <string key="toast.autostartOn">已加入开机启动</string>
-
-
-
-  <string key="toast.autostartOff">已取消开机启动</string>
-
-
-
-  <string key="settings.name">设备显示名</string>
-
-
-
-  <string key="settings.nameHint">其他设备上看到的名字，修改后立即生效。</string>
-
-
-
-  <string key="settings.dir">接收保存目录</string>
-
-
-
-  <string key="settings.dirPick">选择…</string>
-
-
-
-  <string key="settings.dirOk">目录可用，将写入此位置</string>
-
-
-
-  <string key="settings.dirFail">目录不可写</string>
-
-
-
-  <string key="settings.id">完整 ID</string>
-
-
-
-  <string key="settings.shortId">短 ID #{id} · 同子网可直接输入这三位数连接</string>
-
-
-
-  <string key="settings.reset">重置</string>
-
-
-
-  <string key="settings.resetHint">用于识别本机；重置完整 ID 后其他设备需重新识别。</string>
-
-
-
-  <string key="settings.ports">监听端口</string>
-
-
-
-  <string key="settings.portsHint">UDP 发现 / TCP 控制与数据（保存后立即生效）</string>
-
-
-
-  <string key="settings.udp">UDP</string>
-
-
-
-  <string key="settings.tcp">TCP</string>
-
-
-
-  <string key="settings.streams">发送并发流数</string>
-
-
-
-  <string key="settings.streamsHint">发送端设置，接收端自动适配；当前 {n} 条，每次发送生效</string>
-
-
-
-  <string key="settings.compress">压缩</string>
-
-
-
-  <string key="settings.compressOff">关闭（推荐，游戏目录）</string>
-
-
-
-  <string key="settings.compressAuto">自动（文本类）</string>
-
-
-
-  <string key="settings.discovery">局域网发现</string>
-
-
-
-  <string key="settings.discoveryHint">关闭后仍可用 IP 直连</string>
-
-
-
-  <string key="settings.firewall">放行防火墙</string>
-
-
-
-  <string key="settings.firewallHint">允许其他设备连接本机；需要管理员确认</string>
-
-
-
-  <string key="settings.firewallUnknown">防火墙状态未知</string>
-
-
-
-  <string key="settings.firewallOk">已放行：其他设备可连接本机</string>
-
-
-
-  <string key="settings.firewallNone">未放行：其他设备可能无法发现或连接本机</string>
-
-
-
-  <string key="settings.diagnostics">诊断</string>
-
-
-
-  <string key="settings.theme">主题</string>
-
-
-
-  <string key="settings.themeSystem">跟随系统</string>
-
-
-
-  <string key="settings.themeLight">浅色</string>
-
-
-
-  <string key="settings.themeDark">深色</string>
-
-
-
-  <string key="settings.language">语言</string>
-
-
-
-  <string key="settings.save">保存设置</string>
-
-
-
-  <string key="settings.about.version">版本 {version}</string>
-
-
-
-  <string key="settings.about.license">MIT License · 局域网直连，无云端</string>
-
-
-
-  <string key="settings.about.docs">界面规范：WinUI 3 / Fluent 2</string>
-
-
-
-
-
-
-
-  <!-- 提示 -->
-
-
-
-  <string key="toast.needContent">请先选择文件或文件夹</string>
-
-
-
-  <string key="info.title">本机 IPv4 地址</string>
-
-
-
-  <string key="info.copy">点击复制</string>
-
-
-
-  <string key="info.hint">点击地址即可复制</string>
-
-
-
-  <string key="info.empty">未找到网络地址</string>
-
-
-
-  <string key="toast.copied">已复制 {text}</string>
-
-
-
-  <string key="toast.firewallOk">防火墙已放行</string>
-
-
-
-  <string key="toast.firewallFail">放行失败或已取消</string>
-
-
-
-  <string key="toast.saved">设置已保存</string>
-
-
-
-  <string key="toast.reset">已重置完整 ID</string>
-
-
-
-  <string key="toast.sendStarted">已开始发送</string>
-
-
-
-  <string key="toast.sendFailed">发送失败：{message}</string>
-
-
-
-  <string key="toast.scanNone">未发现设备</string>
-
-
-
-  <string key="toast.dirOk">目录可用</string>
-
-
-
-  <string key="toast.dirFail">目录不可写</string>
-
-
-
-  <string key="common.unknown">未知设备</string>
-
-
-
-  <string key="common.bytes">B</string>
-
-
-
-  <string key="settings.checkUpdate">检查更新</string>
-
-
-
-  <string key="settings.updateChecking">正在检查…</string>
-
-
-
-  <string key="settings.updateLatest">已是最新版本</string>
-
-
-
-  <string key="settings.updateFound">发现新版本 {version}</string>
-
-
-
-  <string key="settings.updateIdle">当前版本 {version}</string>
-
-
-
-  <string key="toast.updateFailed">检查更新失败，请检查网络或更新地址</string>
-
-
-
-  <string key="settings.updateFailed">检查失败，请稍后重试</string>
-
-</resources>
-
-
-
+<?xml version="1.0" encoding="utf-8"?>
+
+
+
+<!-- LanPipe UI 文案（中文）。新增语言：复制本文件为 <locale>.xml，在 src/i18n/index.ts 注册。 -->
+
+
+
+<resources lang="zh-CN">
+
+
+
+  <!-- 应用 -->
+
+
+
+  <string key="app.name">LanPipe</string>
+
+
+
+  <string key="app.subtitle">局域网传输</string>
+
+
+
+    <string key="window.minimize">最小化</string>
+
+
+
+  <string key="window.maximize">最大化</string>
+
+
+
+  <string key="window.restore">向下还原</string>
+
+
+
+  <string key="window.close">关闭</string>
+
+
+
+<string key="app.version">版本 {version}</string>
+
+
+
+  <string key="identity.local">本机 · {name}</string>
+
+
+
+
+
+
+
+  <!-- 导航 -->
+
+
+
+  <string key="nav.send">发送</string>
+
+
+
+  <string key="nav.receive">接收</string>
+
+
+
+  <string key="nav.history">历史</string>
+
+
+
+  <string key="nav.diagnostics">诊断</string>
+
+
+
+  <string key="diagnostics.title">诊断</string>
+
+
+
+  <string key="diagnostics.overview">概览</string>
+
+
+
+  <string key="diagnostics.network">网络</string>
+
+
+
+  <string key="diagnostics.peers">附近设备</string>
+
+
+
+  <string key="diagnostics.version">版本</string>
+
+
+
+  <string key="diagnostics.osBuild">系统 Build</string>
+
+
+
+  <string key="diagnostics.builtAt">构建时间</string>
+
+
+
+        <string key="diagnostics.webview">WebView2 版本</string>
+
+
+
+    <string key="diagnostics.transparency">窗口透明</string>
+
+
+
+    <string key="diagnostics.transparencyOk">可用</string>
+
+
+
+    <string key="diagnostics.transparencyFallback">运行时缺陷，已回退纯色</string>
+
+
+
+    <string key="diagnostics.backdrop">窗口材质</string>
+
+
+
+  <string key="diagnostics.shortId">短 ID</string>
+
+
+
+  <string key="diagnostics.deviceId">完整 ID</string>
+
+
+
+  <string key="diagnostics.config">配置文件</string>
+
+
+
+  <string key="diagnostics.stateDir">状态目录</string>
+
+
+
+  <string key="diagnostics.journals">个续传记录</string>
+
+
+
+  <string key="diagnostics.ports">监听端口</string>
+
+
+
+  <string key="diagnostics.discovery">局域网发现</string>
+
+
+
+  <string key="diagnostics.streams">并发流</string>
+
+
+
+  <string key="diagnostics.firewall">防火墙</string>
+
+
+
+  <string key="diagnostics.downloadDir">接收目录</string>
+
+
+
+  <string key="diagnostics.on">已开启</string>
+
+
+
+  <string key="diagnostics.off">已关闭</string>
+
+
+
+  <string key="diagnostics.noInterface">没有可用网卡</string>
+
+
+
+  <string key="diagnostics.noPeers">暂无设备</string>
+
+
+
+  <string key="diagnostics.refresh">刷新</string>
+
+
+
+  <string key="diagnostics.copy">复制诊断信息</string>
+
+
+
+  <string key="diagnostics.copied">诊断信息已复制</string>
+
+
+
+  <string key="diagnostics.error">诊断失败</string>
+
+
+
+  <string key="diagnostics.errorHint">错误信息</string>
+
+
+
+  <string key="nav.settings">设置</string>
+
+
+
+
+
+
+
+  <!-- 状态栏 -->
+
+
+
+  <string key="status.ready">就绪</string>
+
+
+
+  <string key="status.discovering">发现中 · {count} 台设备</string>
+
+
+
+  <string key="status.sending">正在发送</string>
+
+
+
+  <string key="status.receiving">正在接收</string>
+
+
+
+  <string key="status.done">已完成</string>
+
+
+
+  <string key="status.failed">传输失败</string>
+
+
+
+
+
+
+
+  <!-- 发送页 -->
+
+
+
+  <string key="send.title">发送</string>
+
+
+
+  <string key="send.subtitle">选择文件或文件夹，再指定设备</string>
+
+
+
+  <string key="send.drop.title">拖入文件或文件夹</string>
+
+
+
+  <string key="send.drop.hint">支持多选 · 目录保留原结构</string>
+
+
+
+  <string key="send.pickFiles">选择文件</string>
+
+
+
+  <string key="send.pickFolder">选择文件夹</string>
+
+
+
+  <string key="send.staged.empty">尚未选择内容</string>
+
+
+
+  <string key="send.staged.title">待发送 · {count} 项 · {size}</string>
+
+
+
+  <string key="send.clear">清空</string>
+
+
+
+  <string key="send.remove">移除</string>
+
+
+
+  <string key="send.primary">选择设备发送</string>
+
+
+
+  <string key="send.primaryHint">也可点击右侧设备卡片直接发送</string>
+
+
+
+  <string key="send.empty">暂无待发送内容</string>
+
+
+
+
+
+
+
+  <!-- 设备 -->
+
+
+
+  <string key="devices.title">附近设备</string>
+
+
+
+  <string key="devices.refresh">刷新</string>
+
+
+
+  <string key="devices.empty">未发现设备</string>
+
+
+
+  <string key="devices.emptyHint">点击刷新，或使用 IP 直连</string>
+
+
+
+  <string key="devices.online">在线</string>
+
+
+
+  <string key="devices.idle">空闲</string>
+
+
+
+  <string key="devices.send">发送</string>
+
+
+
+
+
+
+
+  <!-- IP 直连 -->
+
+
+
+  <string key="direct.title">IP 直连</string>
+
+
+
+  <string key="direct.placeholder">只输短 ID，如 005</string>
+
+
+
+  <string key="direct.connect">连接</string>
+
+
+
+  <string key="direct.hint">短 ID 扫描本机所有子网，或输完整 IP[:端口]</string>
+
+
+
+  <string key="direct.invalid">格式不正确：请输入短 ID 或 IP[:端口]</string>
+
+
+
+  <string key="direct.scanning">正在扫描 {target}…</string>
+
+
+
+  <string key="direct.found">发现 {count} 台设备</string>
+
+
+
+  <string key="direct.none">未发现设备</string>
+
+
+
+
+
+
+
+  <!-- 接收页 -->
+
+
+
+  <string key="receive.title">接收</string>
+
+
+
+  <string key="receive.subtitle">本机设备名 {name} · 端口 {port}</string>
+
+
+
+  <string key="receive.idle">等待发送端连接…</string>
+
+
+
+  <string key="receive.idleHint">接收端会在后台自动接收，无需操作</string>
+
+
+
+  <string key="receive.incomplete.title">未完成传输</string>
+
+
+
+  <string key="receive.incomplete.desc">来自 {name} · {done}/{total} 文件（{percent}%）</string>
+
+
+
+  <string key="receive.incomplete.hint">重新发送同一目录即可自动续传</string>
+
+
+
+  <string key="receive.current.from">来自 {name}</string>
+
+
+
+  <string key="receive.current.files">{done} / {total} 文件</string>
+
+
+
+  <string key="receive.current.bytes">{done} / {total}</string>
+
+
+
+  <string key="receive.current.speed">{speed} · 剩余 {eta}</string>
+
+
+
+  <string key="receive.current.open">打开接收文件夹</string>
+
+
+
+  <string key="receive.saved.title">保存到</string>
+
+
+
+  <string key="receive.open">打开</string>
+
+
+
+  <string key="receive.change">更改</string>
+
+
+
+  <string key="receive.recent.title">最近接收</string>
+
+
+
+  <string key="receive.recent.all">全部</string>
+
+
+
+
+
+
+
+  <!-- 历史页 -->
+
+
+
+  <string key="history.title">历史</string>
+
+
+
+  <string key="history.empty">暂无传输记录</string>
+
+
+
+  <string key="history.direction">方向</string>
+
+
+
+  <string key="history.peer">设备</string>
+
+
+
+  <string key="history.size">内容</string>
+
+
+
+  <string key="history.time">时间</string>
+
+
+
+  <string key="history.state">状态</string>
+
+
+
+  <string key="history.reason">原因</string>
+
+
+
+  <string key="history.emptyHint">发送或接收完成后会记录在这里</string>
+
+
+
+  <string key="receive.emptyHint">接收端在后台待命，收到请求会自动开始</string>
+
+
+
+  <string key="history.done">完成</string>
+
+
+
+  <string key="history.interrupted">已中断</string>
+
+
+
+  <string key="history.send">发送</string>
+
+
+
+  <string key="history.receive">接收</string>
+
+
+
+  <string key="history.meta">{files} 个文件 · {size}</string>
+
+
+
+
+
+
+
+  <!-- 设置页 -->
+
+
+
+  <string key="settings.title">设置</string>
+
+
+
+  <string key="settings.group.device">设备</string>
+
+
+
+  <string key="settings.group.transfer">传输</string>
+
+
+
+  <string key="settings.group.network">网络</string>
+
+
+
+  <string key="settings.group.appearance">外观与语言</string>
+
+
+
+  <string key="settings.group.about">关于</string>
+
+
+
+  <string key="settings.group.startup">启动</string>
+
+
+
+  <string key="settings.autostart">开机时启动 LanPipe</string>
+
+
+
+  <string key="settings.autostartHint">只影响当前用户，可在任务管理器启动项里关闭</string>
+
+
+
+  <string key="toast.autostartOn">已加入开机启动</string>
+
+
+
+  <string key="toast.autostartOff">已取消开机启动</string>
+
+
+
+  <string key="settings.name">设备显示名</string>
+
+
+
+  <string key="settings.nameHint">其他设备上看到的名字，修改后立即生效。</string>
+
+
+
+  <string key="settings.dir">接收保存目录</string>
+
+
+
+  <string key="settings.dirPick">选择…</string>
+
+
+
+  <string key="settings.dirOk">目录可用，将写入此位置</string>
+
+
+
+  <string key="settings.dirFail">目录不可写</string>
+
+
+
+  <string key="settings.id">完整 ID</string>
+
+
+
+  <string key="settings.shortId">短 ID #{id} · 同子网可直接输入这三位数连接</string>
+
+
+
+  <string key="settings.reset">重置</string>
+
+
+
+  <string key="settings.resetHint">用于识别本机；重置完整 ID 后其他设备需重新识别。</string>
+
+
+
+  <string key="settings.ports">监听端口</string>
+
+
+
+  <string key="settings.portsHint">UDP 发现 / TCP 控制与数据（保存后立即生效）</string>
+
+
+
+  <string key="settings.udp">UDP</string>
+
+
+
+  <string key="settings.tcp">TCP</string>
+
+
+
+  <string key="settings.streams">发送并发流数</string>
+
+
+
+  <string key="settings.streamsHint">发送端设置，接收端自动适配；当前 {n} 条，每次发送生效</string>
+
+
+
+  <string key="settings.compress">压缩</string>
+
+
+
+  <string key="settings.compressOff">关闭（推荐，游戏目录）</string>
+
+
+
+  <string key="settings.compressAuto">自动（文本类）</string>
+
+
+
+  <string key="settings.discovery">局域网发现</string>
+
+
+
+  <string key="settings.discoveryHint">关闭后仍可用 IP 直连</string>
+
+
+
+  <string key="settings.firewall">放行防火墙</string>
+
+
+
+  <string key="settings.firewallHint">允许其他设备连接本机；需要管理员确认</string>
+
+
+
+  <string key="settings.firewallUnknown">防火墙状态未知</string>
+
+
+
+  <string key="settings.firewallOk">已放行：其他设备可连接本机</string>
+
+
+
+  <string key="settings.firewallNone">未放行：其他设备可能无法发现或连接本机</string>
+
+
+
+  <string key="settings.diagnostics">诊断</string>
+
+
+
+  <string key="settings.theme">主题</string>
+
+
+
+  <string key="settings.themeSystem">跟随系统</string>
+
+
+
+  <string key="settings.themeLight">浅色</string>
+
+
+
+  <string key="settings.themeDark">深色</string>
+
+
+
+  <string key="settings.language">语言</string>
+
+
+
+  <string key="settings.save">保存设置</string>
+
+
+
+  <string key="settings.about.version">版本 {version}</string>
+
+
+
+  <string key="settings.about.license">MIT License · 局域网直连，无云端</string>
+
+
+
+  <string key="settings.about.docs">界面规范：WinUI 3 / Fluent 2</string>
+
+
+
+
+
+
+
+  <!-- 提示 -->
+
+
+
+  <string key="toast.needContent">请先选择文件或文件夹</string>
+
+
+
+  <string key="info.title">本机 IPv4 地址</string>
+
+
+
+  <string key="info.copy">点击复制</string>
+
+
+
+  <string key="info.hint">点击地址即可复制</string>
+
+
+
+  <string key="info.empty">未找到网络地址</string>
+
+
+
+  <string key="toast.copied">已复制 {text}</string>
+
+
+
+  <string key="toast.firewallOk">防火墙已放行</string>
+
+
+
+  <string key="toast.firewallFail">放行失败或已取消</string>
+
+
+
+  <string key="toast.saved">设置已保存</string>
+
+
+
+  <string key="toast.reset">已重置完整 ID</string>
+
+
+
+  <string key="toast.sendStarted">已开始发送</string>
+
+
+
+  <string key="toast.sendFailed">发送失败：{message}</string>
+
+
+
+  <string key="toast.scanNone">未发现设备</string>
+
+
+
+  <string key="toast.dirOk">目录可用</string>
+
+
+
+  <string key="toast.dirFail">目录不可写</string>
+
+
+
+  <string key="common.unknown">未知设备</string>
+
+
+
+  <string key="common.bytes">B</string>
+
+
+
+  <string key="settings.checkUpdate">检查更新</string>
+
+
+
+  <string key="settings.updateChecking">正在检查…</string>
+
+
+
+  <string key="settings.updateLatest">已是最新版本</string>
+
+
+
+  <string key="settings.updateFound">发现新版本 {version}</string>
+
+
+
+  <string key="settings.updateIdle">当前版本 {version}</string>
+
+
+
+  <string key="toast.updateFailed">检查更新失败，请检查网络或更新地址</string>
+
+
+
+  <string key="settings.updateFailed">检查失败，请稍后重试</string>
+
+  <string key="android.prepare">准备中 · {done}/{total}</string>
+
+  <string key="android.background.title">后台接收中</string>
+
+  <string key="android.background.hint">离开应用后可在通知中查看进度</string>
+
+  <string key="android.notif.channel">传输</string>
+
+  <string key="android.notif.receiving">正在接收 {name}</string>
+
+  <string key="android.notif.receiving.progress">{percent}% · {speed}</string>
+
+  <string key="android.notif.received">已接收 {files} 个文件</string>
+
+  <string key="android.notif.permission">允许通知，后台也能看到接收进度</string>
+
+  <string key="android.openFailed">当前版本还不支持打开文件管理器</string>
+
+  <string key="sheet.remove">移除</string>
+
+  <string key="sheet.clearAll">清空全部</string>
+
+  <string key="sheet.openLocation">打开位置</string>
+
+  <string key="sheet.share">用其他应用打开</string>
+
+  <string key="sheet.copyAddr">复制地址</string>
+
+  <string key="action.backAgainToExit">再按一次退出</string>
+
+  <string key="receive.openFolderAndroid">在文件管理器中查看</string>
+
+  <string key="settings.about.sideload">通过应用商店或 APK 更新</string>
+
+</resources>
+
+
+

@@ -6,6 +6,7 @@ import { t } from "../i18n";
 import { chooseDownloadDir, resetDeviceId, saveSettings, toast } from "../actions";
 import { api } from "../api/tauri";
 import { getVersion } from "@tauri-apps/api/app";
+import { isAndroid } from "../platform";
 
 let version = "";
 
@@ -30,20 +31,23 @@ export function mountSettings(container: HTMLElement): () => void {
       setFirewallState(null);
     }
   };
-  void refreshFirewall();
-  firewallButton?.addEventListener("click", async () => {
-    firewallButton.disabled = true;
-    try {
-      const allowed = await api.firewallAllow();
-      setFirewallState(allowed);
-      toast(allowed ? t("toast.firewallOk") : t("toast.firewallFail"));
-    } catch {
-      toast(t("toast.firewallFail"));
-      void refreshFirewall();
-    } finally {
-      firewallButton.disabled = false;
-    }
-  });
+  // 防火墙是 Windows 专属能力，Android 不渲染也不查询
+  if (!isAndroid) {
+    void refreshFirewall();
+    firewallButton?.addEventListener("click", async () => {
+      firewallButton.disabled = true;
+      try {
+        const allowed = await api.firewallAllow();
+        setFirewallState(allowed);
+        toast(allowed ? t("toast.firewallOk") : t("toast.firewallFail"));
+      } catch {
+        toast(t("toast.firewallFail"));
+        void refreshFirewall();
+      } finally {
+        firewallButton.disabled = false;
+      }
+    });
+  }
   void getVersion()
     .then((value) => {
       version = value;
@@ -274,30 +278,38 @@ function build(): HTMLElement {
         el("small", { class: "muted", text: t("settings.discoveryHint") }),
       ),
     ),
-    el(
-      "div",
-      { class: "card-actions" },
-      el(
-        "span",
-        { class: "muted", id: "firewall-state", text: t("settings.firewallUnknown") },
-      ),
-      el(
-        "button",
-        {
-          class: "btn ghost small",
-          type: "button",
-          id: "firewall-btn",
-          title: t("settings.firewallHint"),
-        },
-        t("settings.firewall"),
-      ),
-    ),
+    // 防火墙是 Windows 专属入口，Android 不渲染
+    ...(isAndroid
+      ? []
+      : [
+          el(
+            "div",
+            { class: "card-actions" },
+            el(
+              "span",
+              { class: "muted", id: "firewall-state", text: t("settings.firewallUnknown") },
+            ),
+            el(
+              "button",
+              {
+                class: "btn ghost small",
+                type: "button",
+                id: "firewall-btn",
+                title: t("settings.firewallHint"),
+              },
+              t("settings.firewall"),
+            ),
+          ),
+        ]),
   );
 
   const autostartInput = el("input", { type: "checkbox", id: "set-autostart" }) as HTMLInputElement;
-  void api.autostartEnabled().then((on) => {
-    autostartInput.checked = on;
-  });
+  // 开机自启仅 Windows 有意义，Android 不渲染该卡片
+  if (!isAndroid) {
+    void api.autostartEnabled().then((on) => {
+      autostartInput.checked = on;
+    });
+  }
   autostartInput.addEventListener("change", async () => {
     try {
       await api.autostartSet(autostartInput.checked);
@@ -346,35 +358,55 @@ function build(): HTMLElement {
     ),
   );
 
-  const updateBtn = el("button", {
-    class: "btn small",
-    id: "update-btn",
-    text: t("settings.checkUpdate"),
-  });
-  const updateState = el("span", { class: "muted", id: "update-state" });
-  updateBtn.addEventListener("click", async () => {
-    updateBtn.setAttribute("disabled", "true");
-    updateState.textContent = t("settings.updateChecking");
-    try {
-      const result = await api.checkUpdate();
-      updateState.textContent = result
-        ? t("settings.updateFound", { version: result.version })
-        : t("settings.updateLatest");
-    } catch (err) {
-      updateState.textContent = t("settings.updateFailed");
-      void err;
-      toast(t("toast.updateFailed"));
-    } finally {
-      updateBtn.removeAttribute("disabled");
-    }
-  });
-  aboutCard.appendChild(el("div", { class: "row", style: "margin-top:12px" }, updateBtn, updateState));
+  if (isAndroid) {
+    // Android 通过应用商店 / APK 覆盖安装更新，不做应用内检查更新
+    aboutCard.appendChild(
+      el(
+        "div",
+        { class: "row", style: "margin-top:12px" },
+        el("span", { class: "muted", text: t("settings.about.sideload") }),
+      ),
+    );
+  } else {
+    const updateBtn = el("button", {
+      class: "btn small",
+      id: "update-btn",
+      text: t("settings.checkUpdate"),
+    });
+    const updateState = el("span", { class: "muted", id: "update-state" });
+    updateBtn.addEventListener("click", async () => {
+      updateBtn.setAttribute("disabled", "true");
+      updateState.textContent = t("settings.updateChecking");
+      try {
+        const result = await api.checkUpdate();
+        updateState.textContent = result
+          ? t("settings.updateFound", { version: result.version })
+          : t("settings.updateLatest");
+      } catch (err) {
+        updateState.textContent = t("settings.updateFailed");
+        void err;
+        toast(t("toast.updateFailed"));
+      } finally {
+        updateBtn.removeAttribute("disabled");
+      }
+    });
+    aboutCard.appendChild(el("div", { class: "row", style: "margin-top:12px" }, updateBtn, updateState));
+  }
 
   return el(
     "div",
     { class: "settings-view" },
     el("div", { class: "page-head" }, el("h1", { class: "page-title", text: t("settings.title") })),
-    el("div", { class: "settings-grid" }, deviceCard, transferCard, networkCard, startupCard, appearanceCard, aboutCard),
+    el(
+      "div",
+      { class: "settings-grid" },
+      deviceCard,
+      transferCard,
+      networkCard,
+      ...(isAndroid ? [] : [startupCard]),
+      appearanceCard,
+      aboutCard,
+    ),
     el("div", { class: "settings-actions" }, saveButton),
   );
 }

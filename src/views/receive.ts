@@ -2,8 +2,11 @@ import { getState, subscribe } from "../state/store";
 import { clear, el, icons, svgIcon, withFocusPreserved } from "../ui/dom";
 import { t } from "../i18n";
 import { fmtBytes, fmtSpeed, fmtTime } from "../ui/format";
-import { chooseDownloadDir, revealPath, saveSettings } from "../actions";
+import { chooseDownloadDir, revealPath, saveSettings, toast } from "../actions";
 import type { Route } from "../layout/shell";
+import { isAndroid } from "../platform";
+import { actionSheet } from "../ui/sheet";
+import { invoke } from "@tauri-apps/api/core";
 
 export function mountReceive(container: HTMLElement, navigate: (route: Route) => void): () => void {
   const render = () =>
@@ -59,6 +62,22 @@ function build(navigate: (route: Route) => void): HTMLElement {
         )
       : null;
 
+  // Android：应用可能被切到后台，原生侧用前台服务通知展示进度，这里给出说明
+  const backgroundBanner =
+    isAndroid && transfer && transfer.state === "active"
+      ? el(
+          "section",
+          { class: "banner" },
+          svgIcon(icons.pulse, 20),
+          el(
+            "div",
+            { class: "grow" },
+            el("div", { class: "banner-title", text: t("android.background.title") }),
+            el("div", { class: "banner-desc", text: t("android.background.hint") }),
+          ),
+        )
+      : null;
+
   const current = transfer ? transferCard(transfer) : idleCard();
 
   const dir = settings?.downloadDir ?? "";
@@ -100,9 +119,9 @@ function build(navigate: (route: Route) => void): HTMLElement {
       {
         class: "btn ghost small",
         type: "button",
-        onclick: () => void revealPath(state.transfer?.rootName ? dir : dir),
+        onclick: () => openSaveDir(dir),
       },
-      t("receive.open"),
+      isAndroid ? t("receive.openFolderAndroid") : t("receive.open"),
     ),
   );
 
@@ -126,7 +145,31 @@ function build(navigate: (route: Route) => void): HTMLElement {
       : el("div", { class: "empty", text: t("history.empty") }),
   );
 
-  return el("div", { class: "receive-view" }, head, banner, current, saveCard, recent);
+  return el("div", { class: "receive-view" }, head, banner, backgroundBanner, current, saveCard, recent);
+}
+
+/**
+ * 打开保存目录：
+ * - 桌面：调用 reveal_path 打开资源管理器
+ * - Android：交给系统文件管理器 / 其他应用（原生命令由移动端阶段实现，未就绪时提示）
+ */
+function openSaveDir(dir: string): void {
+  if (!isAndroid) {
+    void revealPath(dir);
+    return;
+  }
+  actionSheet(null, [
+    { label: t("sheet.openLocation"), onSelect: () => void openWithAndroid(dir, "folder") },
+    { label: t("sheet.share"), onSelect: () => void openWithAndroid(dir, "view") },
+  ]);
+}
+
+async function openWithAndroid(path: string, mode: "folder" | "view"): Promise<void> {
+  try {
+    await invoke("android_open_path", { path, mode });
+  } catch {
+    toast(t("android.openFailed"));
+  }
 }
 
 function percentOf(done: number, total: number): number {
