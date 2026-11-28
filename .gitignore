@@ -4,7 +4,14 @@
 /target/
 /apps/desktop/src-tauri/target/
 /target-linux/
-/apps/desktop/src-tauri/gen/
+/apps/desktop/src-tauri/gen/schemas/
+/apps/desktop/src-tauri/gen/android/.gradle/
+/apps/desktop/src-tauri/gen/android/build/
+/apps/desktop/src-tauri/gen/android/app/build/
+/apps/desktop/src-tauri/gen/android/local.properties
+/apps/desktop/src-tauri/gen/android/.tauri/
+/apps/desktop/src-tauri/gen/android/tauri.settings.gradle
+/apps/desktop/src-tauri/gen/android/app/src/main/assets/
 
 # ä¾èµ–
 node_modules/
@@ -48,5 +55,5 @@ __pycache__/
 docs/_*.png
 docs/tmp/
 
-# Linux ¹¹½¨²úÎï
+# Linux ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 /dist-linux/
